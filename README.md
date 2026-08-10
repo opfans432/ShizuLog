@@ -1,9 +1,29 @@
-# ShizuLog
+<p align="center">
+  <img src="app/src/main/res/drawable/shizulog_logo.png" width="140" alt="ShizuLog icon">
+</p>
 
-**ShizuLog** 是一个使用 **Shizuku** 授权的 Android 指定应用 Logcat 记录工具，适合排查闪退、卡死、异常行为与 Mod 调试问题。
+<h1 align="center">ShizuLog</h1>
 
-**当前版本：v1.1.0**  
-**贡献者：ChatGPT**
+<p align="center">
+  基于 Shizuku 的 Android 指定应用 Logcat 记录工具
+</p>
+
+<p align="center">
+  <b>v1.1.0</b><br>
+  作者 / 贡献者：<b>ChatGPT</b>
+</p>
+
+---
+
+## 简介
+
+ShizuLog 是一个使用 **Shizuku** 授权的 Android 日志记录与崩溃排查工具，
+支持针对指定应用持续采集 Logcat、恢复日志会话以及补抓崩溃现场。
+
+- **版本：** v1.1.0
+- **作者 / 贡献者：** ChatGPT
+- **许可证：** MIT
+- **贡献者名单：** [CONTRIBUTORS.md](CONTRIBUTORS.md)
 
 ## 功能
 
