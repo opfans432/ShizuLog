@@ -1,0 +1,70 @@
+name: Build and Release APK
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Install Android SDK 35
+        shell: bash
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Build debug APK
+        run: gradle --no-daemon clean :app:assembleDebug
+
+      - name: Prepare APK
+        shell: bash
+        run: |
+          mkdir -p dist
+          cp app/build/outputs/apk/debug/app-debug.apk dist/ShizuLog-v1.0.0.apk
+          sha256sum dist/ShizuLog-v1.0.0.apk | tee dist/ShizuLog-v1.0.0.apk.sha256
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ShizuLog-v1.0.0
+          path: |
+            dist/ShizuLog-v1.0.0.apk
+            dist/ShizuLog-v1.0.0.apk.sha256
+
+      - name: Publish v1.0.0 if absent
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: v1.0.0
+        shell: bash
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "$TAG already exists; keeping the existing release unchanged."
+          else
+            gh release create "$TAG" \
+              dist/ShizuLog-v1.0.0.apk \
+              dist/ShizuLog-v1.0.0.apk.sha256 \
+              --target "$GITHUB_SHA" \
+              --title "ShizuLog v1.0.0" \
+              --notes-file RELEASE_NOTES.md
+          fi
