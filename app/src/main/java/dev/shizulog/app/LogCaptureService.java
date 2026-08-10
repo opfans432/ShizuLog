@@ -6,6 +6,7 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.IBinder;
@@ -28,6 +29,7 @@ import rikka.shizuku.Shizuku;
 public class LogCaptureService extends Service {
     public static final String ACTION_START = "dev.shizulog.app.START";
     public static final String ACTION_STOP = "dev.shizulog.app.STOP";
+    public static final String ACTION_SNAPSHOT = "dev.shizulog.app.SNAPSHOT";
     public static final String ACTION_LINE = "dev.shizulog.app.LINE";
     public static final String ACTION_STATUS = "dev.shizulog.app.STATUS";
     public static final String EXTRA_PACKAGE = "package";
@@ -40,10 +42,24 @@ public class LogCaptureService extends Service {
     private static final String CHANNEL_ID = "log_capture";
     private static final int NOTIFICATION_ID = 1001;
 
+    private static final String PREFS = "shizulog_state";
+    private static final String KEY_TARGET_PACKAGE = "target_package";
+    private static final String KEY_TARGET_LABEL = "target_label";
+    private static final String KEY_TARGET_UID = "target_uid";
+    private static final String KEY_CURRENT_LOG_PATH = "current_log_path";
+    private static final String KEY_LAST_STATUS = "last_status";
+    private static final String KEY_RECORDING = "recording";
+
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
+    private final ExecutorService snapshotExecutor = Executors.newSingleThreadExecutor();
+    private final Object fileWriteLock = new Object();
+
     private volatile Process logcatProcess;
     private volatile boolean running;
     private File currentFile;
+    private volatile String currentPackage = "";
+    private volatile String currentLabel = "";
+    private volatile int currentUid = -1;
 
     @Override
     public void onCreate() {
@@ -53,13 +69,36 @@ public class LogCaptureService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        if (intent == null) return START_NOT_STICKY;
+        SharedPreferences p = prefs();
+
+        if (intent == null) {
+            if (p.getBoolean(KEY_RECORDING, false)) {
+                String pkg = p.getString(KEY_TARGET_PACKAGE, "");
+                String label = p.getString(KEY_TARGET_LABEL, pkg);
+                int uid = p.getInt(KEY_TARGET_UID, -1);
+                if (pkg != null && !pkg.isEmpty() && uid >= 0) {
+                    startForeground(NOTIFICATION_ID, buildNotification(label == null ? pkg : label));
+                    startCapture(pkg, label == null ? pkg : label, uid);
+                    return START_STICKY;
+                }
+            }
+            return START_NOT_STICKY;
+        }
+
         String action = intent.getAction();
+
+        if (ACTION_SNAPSHOT.equals(action)) {
+            captureCrashSnapshot();
+            return running ? START_STICKY : START_NOT_STICKY;
+        }
+
         if (ACTION_STOP.equals(action)) {
+            p.edit().putBoolean(KEY_RECORDING, false).apply();
             stopCapture("已停止");
             stopSelf();
             return START_NOT_STICKY;
         }
+
         if (ACTION_START.equals(action)) {
             String pkg = intent.getStringExtra(EXTRA_PACKAGE);
             String label = intent.getStringExtra(EXTRA_LABEL);
@@ -69,15 +108,34 @@ public class LogCaptureService extends Service {
                 stopSelf();
                 return START_NOT_STICKY;
             }
-            startForeground(NOTIFICATION_ID, buildNotification(label == null ? pkg : label));
-            startCapture(pkg, label == null ? pkg : label, uid);
+            currentPackage = pkg;
+            currentLabel = label == null ? pkg : label;
+            currentUid = uid;
+            p.edit()
+                    .putString(KEY_TARGET_PACKAGE, pkg)
+                    .putString(KEY_TARGET_LABEL, currentLabel)
+                    .putInt(KEY_TARGET_UID, uid)
+                    .putBoolean(KEY_RECORDING, true)
+                    .apply();
+
+            startForeground(NOTIFICATION_ID, buildNotification(currentLabel));
+            startCapture(pkg, currentLabel, uid);
         }
-        return START_NOT_STICKY;
+        return running ? START_STICKY : START_NOT_STICKY;
     }
 
     @SuppressWarnings("deprecation")
     private void startCapture(String pkg, String label, int uid) {
         stopCapture(null);
+        currentPackage = pkg;
+        currentLabel = label;
+        currentUid = uid;
+        prefs().edit()
+                .putString(KEY_TARGET_PACKAGE, pkg)
+                .putString(KEY_TARGET_LABEL, label)
+                .putInt(KEY_TARGET_UID, uid)
+                .putBoolean(KEY_RECORDING, true)
+                .apply();
         running = true;
         executor.execute(() -> {
             BufferedWriter writer = null;
@@ -98,6 +156,7 @@ public class LogCaptureService extends Service {
                 }
                 String time = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(new Date());
                 currentFile = new File(dir, sanitize(pkg) + "_" + time + ".log");
+                prefs().edit().putString(KEY_CURRENT_LOG_PATH, currentFile.getAbsolutePath()).apply();
                 writer = new BufferedWriter(new OutputStreamWriter(
                         new FileOutputStream(currentFile, false), StandardCharsets.UTF_8));
                 writer.write("# ShizuLog\n");
@@ -119,9 +178,11 @@ public class LogCaptureService extends Service {
                         new InputStreamReader(logcatProcess.getInputStream(), StandardCharsets.UTF_8))) {
                     String line;
                     while (running && (line = reader.readLine()) != null) {
-                        writer.write(line);
-                        writer.newLine();
-                        writer.flush();
+                        synchronized (fileWriteLock) {
+                            writer.write(line);
+                            writer.newLine();
+                            writer.flush();
+                        }
                         sendLine(line);
                     }
                 }
@@ -135,6 +196,7 @@ public class LogCaptureService extends Service {
                 sendStatus("记录失败: " + e.getClass().getSimpleName() + ": " + safeMessage(e), currentFile);
             } finally {
                 running = false;
+                prefs().edit().putBoolean(KEY_RECORDING, false).apply();
                 if (writer != null) {
                     try { writer.close(); } catch (Exception ignored) {}
                 }
@@ -164,10 +226,78 @@ public class LogCaptureService extends Service {
     }
 
     private void sendStatus(String text, File file) {
+        SharedPreferences.Editor e = prefs().edit().putString(KEY_LAST_STATUS, text == null ? "" : text);
+        if (file != null) e.putString(KEY_CURRENT_LOG_PATH, file.getAbsolutePath());
+        e.apply();
+
         Intent i = new Intent(ACTION_STATUS).setPackage(getPackageName());
         i.putExtra(EXTRA_STATUS, text);
         if (file != null) i.putExtra(EXTRA_FILE, file.getAbsolutePath());
         sendBroadcast(i);
+    }
+
+    private SharedPreferences prefs() {
+        return getSharedPreferences(PREFS, MODE_PRIVATE);
+    }
+
+    private void captureCrashSnapshot() {
+        snapshotExecutor.execute(() -> {
+            String pkg = currentPackage;
+            if (pkg == null || pkg.isEmpty()) {
+                pkg = prefs().getString(KEY_TARGET_PACKAGE, "");
+            }
+
+            File file = currentFile;
+            if (file == null) {
+                String path = prefs().getString(KEY_CURRENT_LOG_PATH, null);
+                if (path != null) file = new File(path);
+            }
+
+            if (pkg == null || pkg.isEmpty() || file == null || !file.isFile()) return;
+
+            final String targetPkg = pkg;
+            final File targetFile = file;
+
+            try {
+                if (!Shizuku.pingBinder()
+                        || Shizuku.checkSelfPermission() != PackageManager.PERMISSION_GRANTED) return;
+
+                String shellPkg = targetPkg.replaceAll("[^a-zA-Z0-9._]", "");
+                String cmd =
+                        "{ "
+                        + "logcat -d -b crash -v threadtime -t 1600; "
+                        + "logcat -d -b main -b system -v threadtime -t 3000 "
+                        + "AndroidRuntime:E ActivityManager:I ActivityTaskManager:I DEBUG:F libc:F '*:S'; "
+                        + "} 2>&1 | grep -F -B 30 -A 180 '" + shellPkg + "' | tail -n 1800";
+
+                Process snapshotProcess = Shizuku.newProcess(
+                        new String[]{"/system/bin/sh", "-c", cmd}, null, null);
+
+                StringBuilder out = new StringBuilder();
+                try (BufferedReader reader = new BufferedReader(
+                        new InputStreamReader(snapshotProcess.getInputStream(), StandardCharsets.UTF_8))) {
+                    String line;
+                    while ((line = reader.readLine()) != null) out.append(line).append('\n');
+                }
+                snapshotProcess.waitFor();
+
+                if (out.length() == 0) return;
+
+                synchronized (fileWriteLock) {
+                    try (BufferedWriter append = new BufferedWriter(new OutputStreamWriter(
+                            new FileOutputStream(targetFile, true), StandardCharsets.UTF_8))) {
+                        append.write("\n\n# ===== AUTO CRASH SNAPSHOT =====\n");
+                        append.write("# target=" + targetPkg + "\n");
+                        append.write("# captured=" + new Date() + "\n");
+                        append.write(out.toString());
+                        append.write("# ===== END CRASH SNAPSHOT =====\n");
+                    }
+                }
+
+                sendStatus("已自动补抓崩溃快照并追加到当前日志", targetFile);
+            } catch (Throwable ignored) {
+            }
+        });
     }
 
     private Notification buildNotification(String label) {
@@ -214,6 +344,7 @@ public class LogCaptureService extends Service {
     public void onDestroy() {
         stopCapture(null);
         executor.shutdownNow();
+        snapshotExecutor.shutdownNow();
         super.onDestroy();
     }
 

@@ -7,6 +7,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.graphics.Typeface;
@@ -26,6 +27,7 @@ import android.widget.Toast;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.text.Collator;
 import java.util.ArrayList;
 import java.util.List;
@@ -37,6 +39,15 @@ public class MainActivity extends Activity {
     private static final int REQ_CREATE_DOCUMENT = 2001;
     private static final int REQ_SHIZUKU_PERMISSION = 2002;
     private static final int MAX_SCREEN_CHARS = 120_000;
+
+    // 关键状态绝不能只放在 Activity 内存中。
+    private static final String PREFS = "shizulog_state";
+    private static final String KEY_TARGET_PACKAGE = "target_package";
+    private static final String KEY_TARGET_LABEL = "target_label";
+    private static final String KEY_CURRENT_LOG_PATH = "current_log_path";
+    private static final String KEY_LAST_STATUS = "last_status";
+    private static final String KEY_RECORDING = "recording";
+    private static final String KEY_TARGET_LAUNCHED = "target_launched";
 
     private EditText packageInput;
     private TextView selectedLabel;
@@ -75,8 +86,14 @@ public class MainActivity extends Activity {
             } else if (LogCaptureService.ACTION_STATUS.equals(intent.getAction())) {
                 String status = intent.getStringExtra(LogCaptureService.EXTRA_STATUS);
                 String path = intent.getStringExtra(LogCaptureService.EXTRA_FILE);
-                if (status != null) statusText.setText(status);
-                if (path != null) currentLogPath = path;
+                if (status != null) {
+                    statusText.setText(status);
+                    prefs().edit().putString(KEY_LAST_STATUS, status).apply();
+                }
+                if (path != null) {
+                    currentLogPath = path;
+                    prefs().edit().putString(KEY_CURRENT_LOG_PATH, path).apply();
+                }
             }
         }
     };
@@ -85,6 +102,7 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(buildUi());
+        restoreUiState();
         registerStatusReceiver();
         Shizuku.addBinderReceivedListenerSticky(binderReceivedListener);
         Shizuku.addBinderDeadListener(binderDeadListener);
@@ -159,9 +177,12 @@ public class MainActivity extends Activity {
         LinearLayout control2 = row();
         Button clear = button("清空屏幕");
         clear.setOnClickListener(v -> { screenBuffer.setLength(0); logText.setText(""); });
+        Button snapshot = button("崩溃快照");
+        snapshot.setOnClickListener(v -> requestCrashSnapshot());
         Button export = button("导出日志");
         export.setOnClickListener(v -> exportLog());
         control2.addView(clear, lpWeight());
+        control2.addView(snapshot, lpWeightWithLeft());
         control2.addView(export, lpWeightWithLeft());
         root.addView(control2);
 
@@ -319,6 +340,10 @@ public class MainActivity extends Activity {
         } catch (Exception e) {
             selectedLabel.setText("目标：" + label + "\n包名：" + pkg);
         }
+        prefs().edit()
+                .putString(KEY_TARGET_PACKAGE, pkg)
+                .putString(KEY_TARGET_LABEL, label)
+                .apply();
     }
 
     private void startCapture() {
@@ -385,6 +410,7 @@ public class MainActivity extends Activity {
             return;
         }
         launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        prefs().edit().putBoolean(KEY_TARGET_LAUNCHED, true).apply();
         startActivity(launch);
     }
 
@@ -458,7 +484,100 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        restoreUiState();
         refreshShizukuState();
+
+        SharedPreferences p = prefs();
+        if (p.getBoolean(KEY_TARGET_LAUNCHED, false)) {
+            p.edit().putBoolean(KEY_TARGET_LAUNCHED, false).apply();
+            requestCrashSnapshot();
+        }
+    }
+
+    private SharedPreferences prefs() {
+        return getSharedPreferences(PREFS, MODE_PRIVATE);
+    }
+
+    private void restoreUiState() {
+        if (packageInput == null || selectedLabel == null || statusText == null || logText == null) return;
+
+        SharedPreferences p = prefs();
+        String pkg = p.getString(KEY_TARGET_PACKAGE, "");
+        String label = p.getString(KEY_TARGET_LABEL, "");
+
+        if (pkg != null && !pkg.isEmpty()) {
+            try {
+                ApplicationInfo ai = getPackageManager().getApplicationInfo(pkg, 0);
+                if (label == null || label.isEmpty()) {
+                    label = String.valueOf(getPackageManager().getApplicationLabel(ai));
+                }
+                selectedPackage = pkg;
+                selectedAppLabel = label;
+                packageInput.setText(pkg);
+                selectedLabel.setText("目标：" + label + "\n包名：" + pkg + "\nUID：" + ai.uid);
+            } catch (Exception e) {
+                selectedPackage = pkg;
+                selectedAppLabel = label == null ? "" : label;
+                packageInput.setText(pkg);
+                selectedLabel.setText("上次目标：" + selectedAppLabel + "\n包名：" + pkg + "\n（当前未找到安装包）");
+            }
+        }
+
+        String path = p.getString(KEY_CURRENT_LOG_PATH, null);
+        if (path != null && new File(path).isFile()) {
+            currentLogPath = path;
+            loadLogTail(path);
+        }
+
+        String lastStatus = p.getString(KEY_LAST_STATUS, "");
+        if (lastStatus != null && !lastStatus.isEmpty()) {
+            boolean recording = p.getBoolean(KEY_RECORDING, false);
+            statusText.setText((recording ? "● 正在记录\n" : "") + lastStatus);
+        }
+    }
+
+    private void loadLogTail(String path) {
+        File file = new File(path);
+        if (!file.isFile()) return;
+
+        long maxBytes = MAX_SCREEN_CHARS * 2L;
+        long start = Math.max(0L, file.length() - maxBytes);
+
+        try (FileInputStream in = new FileInputStream(file)) {
+            long remainingSkip = start;
+            while (remainingSkip > 0) {
+                long skipped = in.skip(remainingSkip);
+                if (skipped <= 0) break;
+                remainingSkip -= skipped;
+            }
+
+            int cap = (int) Math.min(maxBytes, Math.max(0L, file.length() - start));
+            byte[] data = new byte[Math.max(cap, 1)];
+            int total = 0;
+            int n;
+            while (total < data.length && (n = in.read(data, total, data.length - total)) > 0) {
+                total += n;
+            }
+
+            String text = new String(data, 0, total, StandardCharsets.UTF_8);
+            if (text.length() > MAX_SCREEN_CHARS) {
+                text = text.substring(text.length() - MAX_SCREEN_CHARS);
+            }
+            screenBuffer.setLength(0);
+            screenBuffer.append(text);
+            logText.setText(text);
+            if (logScroll != null) logScroll.post(() -> logScroll.fullScroll(View.FOCUS_DOWN));
+        } catch (Exception ignored) {
+        }
+    }
+
+    private void requestCrashSnapshot() {
+        Intent s = new Intent(this, LogCaptureService.class)
+                .setAction(LogCaptureService.ACTION_SNAPSHOT);
+        try {
+            startService(s);
+        } catch (Exception ignored) {
+        }
     }
 
     @Override
