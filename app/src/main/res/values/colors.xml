@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="md_theme_primary">#146B5A</color>
+    <color name="md_theme_onPrimary">#FFFFFF</color>
+    <color name="md_theme_primaryContainer">#D0F3E6</color>
+    <color name="md_theme_onPrimaryContainer">#062019</color>
+
+    <color name="md_theme_secondary">#35618C</color>
+    <color name="md_theme_onSecondary">#FFFFFF</color>
+    <color name="md_theme_secondaryContainer">#D2E4FF</color>
+    <color name="md_theme_onSecondaryContainer">#0A1D2E</color>
+
+    <color name="md_theme_tertiary">#2D6A9F</color>
+    <color name="md_theme_error">#BA1A1A</color>
+    <color name="md_theme_onError">#FFFFFF</color>
+
+    <color name="md_theme_background">#F7F9F8</color>
+    <color name="md_theme_onBackground">#191C1B</color>
+    <color name="md_theme_surface">#FBFDFC</color>
+    <color name="md_theme_surfaceContainer">#EEF2F0</color>
+    <color name="md_theme_surfaceContainerHigh">#E8ECEA</color>
+    <color name="md_theme_onSurface">#191C1B</color>
+    <color name="md_theme_onSurfaceVariant">#404944</color>
+    <color name="md_theme_outline">#707973</color>
+    <color name="md_theme_outlineVariant">#BFC9C3</color>
+
+    <color name="status_success">#247A45</color>
+    <color name="status_success_container">#D7F7DF</color>
+    <color name="status_warning">#936000</color>
+    <color name="status_warning_container">#FFF0C2</color>
+    <color name="status_error">#B3261E</color>
+    <color name="status_error_container">#FFDAD6</color>
+
+    <color name="action_start">#2E7D32</color>
+    <color name="action_open">#2864C7</color>
+    <color name="action_stop">#BA1A1A</color>
+
+    <color name="card_surface">#FFFFFF</color>
+    <color name="log_background">#111714</color>
+    <color name="log_text">#D8E5DE</color>
+    <color name="launcher_bg">#E7F5EF</color>
+</resources>

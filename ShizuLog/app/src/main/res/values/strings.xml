@@ -1,5 +1,0 @@
-<resources>
-    <string name="app_name">ShizuLog</string>
-    <string name="notification_channel">ShizuLog 日志记录</string>
-    <string name="notification_title">正在记录 App 日志</string>
-</resources>

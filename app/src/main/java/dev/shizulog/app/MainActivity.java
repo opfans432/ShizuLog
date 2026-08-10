@@ -1,8 +1,6 @@
 package dev.shizulog.app;
 
 import android.Manifest;
-import android.app.Activity;
-import android.app.AlertDialog;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -10,19 +8,26 @@ import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
-import android.graphics.Typeface;
+import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.text.InputType;
-import android.view.Gravity;
 import android.view.View;
-import android.widget.Button;
-import android.widget.EditText;
-import android.widget.LinearLayout;
+import android.widget.ImageView;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
+
+import com.google.android.material.appbar.MaterialToolbar;
+import com.google.android.material.button.MaterialButton;
+import com.google.android.material.chip.Chip;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.google.android.material.textfield.TextInputEditText;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -35,12 +40,11 @@ import java.util.Locale;
 
 import rikka.shizuku.Shizuku;
 
-public class MainActivity extends Activity {
+public class MainActivity extends AppCompatActivity {
     private static final int REQ_CREATE_DOCUMENT = 2001;
     private static final int REQ_SHIZUKU_PERMISSION = 2002;
     private static final int MAX_SCREEN_CHARS = 120_000;
 
-    // 关键状态绝不能只放在 Activity 内存中。
     private static final String PREFS = "shizulog_state";
     private static final String KEY_TARGET_PACKAGE = "target_package";
     private static final String KEY_TARGET_LABEL = "target_label";
@@ -49,50 +53,62 @@ public class MainActivity extends Activity {
     private static final String KEY_RECORDING = "recording";
     private static final String KEY_TARGET_LAUNCHED = "target_launched";
 
-    private EditText packageInput;
+    private TextInputEditText packageInput;
     private TextView selectedLabel;
     private TextView permissionState;
+    private TextView backendText;
     private TextView statusText;
+    private TextView logPathText;
+    private TextView logSizeText;
     private TextView logText;
     private ScrollView logScroll;
+    private ImageView targetAppIcon;
+    private Chip heroShizukuChip;
+
     private String selectedPackage = "";
     private String selectedAppLabel = "";
     private String currentLogPath;
     private boolean pendingStartAfterPermission;
+    private int appendedLineCounter;
     private final StringBuilder screenBuffer = new StringBuilder();
 
     private final Shizuku.OnBinderReceivedListener binderReceivedListener = this::refreshShizukuState;
     private final Shizuku.OnBinderDeadListener binderDeadListener = this::refreshShizukuState;
-    private final Shizuku.OnRequestPermissionResultListener permissionResultListener = (requestCode, grantResult) -> {
-        if (requestCode != REQ_SHIZUKU_PERMISSION) return;
-        refreshShizukuState();
-        if (grantResult == PackageManager.PERMISSION_GRANTED) {
-            toast("Shizuku 授权成功");
-            if (pendingStartAfterPermission) {
-                pendingStartAfterPermission = false;
-                startCaptureInternal();
-            }
-        } else {
-            pendingStartAfterPermission = false;
-            toast("Shizuku 授权被拒绝");
-        }
-    };
+
+    private final Shizuku.OnRequestPermissionResultListener permissionResultListener =
+            (requestCode, grantResult) -> {
+                if (requestCode != REQ_SHIZUKU_PERMISSION) return;
+                refreshShizukuState();
+                if (grantResult == PackageManager.PERMISSION_GRANTED) {
+                    toast("Shizuku 授权成功");
+                    if (pendingStartAfterPermission) {
+                        pendingStartAfterPermission = false;
+                        startCaptureInternal();
+                    }
+                } else {
+                    pendingStartAfterPermission = false;
+                    toast("Shizuku 授权被拒绝");
+                }
+            };
 
     private final BroadcastReceiver receiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
-            if (LogCaptureService.ACTION_LINE.equals(intent.getAction())) {
+            String action = intent.getAction();
+            if (LogCaptureService.ACTION_LINE.equals(action)) {
                 appendLog(intent.getStringExtra(LogCaptureService.EXTRA_LINE));
-            } else if (LogCaptureService.ACTION_STATUS.equals(intent.getAction())) {
+            } else if (LogCaptureService.ACTION_STATUS.equals(action)) {
                 String status = intent.getStringExtra(LogCaptureService.EXTRA_STATUS);
                 String path = intent.getStringExtra(LogCaptureService.EXTRA_FILE);
+
                 if (status != null) {
-                    statusText.setText(status);
+                    setStatus(status);
                     prefs().edit().putString(KEY_LAST_STATUS, status).apply();
                 }
                 if (path != null) {
                     currentLogPath = path;
                     prefs().edit().putString(KEY_CURRENT_LOG_PATH, path).apply();
+                    updateLogMeta();
                 }
             }
         }
@@ -101,139 +117,130 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(buildUi());
+        setContentView(R.layout.activity_main);
+
+        bindViews();
+        applySystemBarInsets();
+        setupActions();
+
         restoreUiState();
         registerStatusReceiver();
+
         Shizuku.addBinderReceivedListenerSticky(binderReceivedListener);
         Shizuku.addBinderDeadListener(binderDeadListener);
         Shizuku.addRequestPermissionResultListener(permissionResultListener);
+
         refreshShizukuState();
         requestNotificationPermissionIfNeeded();
     }
 
-    private View buildUi() {
-        int pad = dp(16);
-        LinearLayout root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(pad, pad, pad, pad);
-        root.setBackgroundColor(0xFFFAFAFA);
+    private void bindViews() {
+        packageInput = findViewById(R.id.packageInput);
+        selectedLabel = findViewById(R.id.selectedLabel);
+        permissionState = findViewById(R.id.permissionState);
+        backendText = findViewById(R.id.backendText);
+        statusText = findViewById(R.id.statusText);
+        logPathText = findViewById(R.id.logPathText);
+        logSizeText = findViewById(R.id.logSizeText);
+        logText = findViewById(R.id.logText);
+        logScroll = findViewById(R.id.logScroll);
+        targetAppIcon = findViewById(R.id.targetAppIcon);
+        heroShizukuChip = findViewById(R.id.heroShizukuChip);
+    }
 
-        TextView title = text("ShizuLog", 24, true);
-        root.addView(title);
-        TextView subtitle = text("Shizuku 授权 · 记录指定应用 logcat（多进程/崩溃缓冲区）", 13, false);
-        subtitle.setTextColor(0xFF666666);
-        root.addView(subtitle);
+    private void applySystemBarInsets() {
+        View root = findViewById(R.id.rootMain);
+        ViewCompat.setOnApplyWindowInsetsListener(root, (view, insets) -> {
+            Insets bars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+            view.setPadding(bars.left, bars.top, bars.right, bars.bottom);
+            return insets;
+        });
+    }
 
-        TextView creator = text("创作者：ChatGPT", 12, false);
-        creator.setTextColor(0xFF777777);
-        root.addView(creator, lpMatchWrap(0, dp(10)));
+    private void setupActions() {
+        MaterialToolbar toolbar = findViewById(R.id.topAppBar);
+        toolbar.setOnMenuItemClickListener(item -> {
+            if (item.getItemId() == R.id.action_about) {
+                startActivity(new Intent(this, AboutActivity.class));
+                return true;
+            }
+            return false;
+        });
 
-        permissionState = text("Shizuku：正在检测…", 14, true);
-        root.addView(permissionState, lpMatchWrap(0, dp(8)));
+        findViewById(R.id.grantButton).setOnClickListener(v -> requestShizukuPermission(false));
+        findViewById(R.id.openShizukuButton).setOnClickListener(v -> openShizukuManager());
+        findViewById(R.id.refreshButton).setOnClickListener(v -> refreshShizukuState());
 
-        LinearLayout grantRow = row();
-        Button grant = button("请求 Shizuku 授权");
-        grant.setOnClickListener(v -> requestShizukuPermission(false));
-        Button openShizuku = button("打开 Shizuku");
-        openShizuku.setOnClickListener(v -> openShizukuManager());
-        Button refresh = button("刷新状态");
-        refresh.setOnClickListener(v -> refreshShizukuState());
-        grantRow.addView(grant, lpWeight());
-        grantRow.addView(openShizuku, lpWeightWithLeft());
-        grantRow.addView(refresh, lpWeightWithLeft());
-        root.addView(grantRow);
+        findViewById(R.id.chooseTargetButton).setOnClickListener(v -> showAppPicker());
+        findViewById(R.id.usePackageButton).setOnClickListener(v -> selectTypedPackage());
 
-        packageInput = new EditText(this);
-        packageInput.setHint("目标包名，例如 com.example.app");
-        packageInput.setSingleLine(true);
-        packageInput.setInputType(InputType.TYPE_CLASS_TEXT);
-        root.addView(packageInput, lpMatchWrap(0, dp(8)));
+        findViewById(R.id.startButton).setOnClickListener(v -> startCapture());
+        findViewById(R.id.openTargetButton).setOnClickListener(v -> launchTarget());
+        findViewById(R.id.stopButton).setOnClickListener(v -> stopCapture());
 
-        LinearLayout chooseRow = row();
-        Button choose = button("选择已安装 App");
-        choose.setOnClickListener(v -> showAppPicker());
-        Button confirmPkg = button("使用此包名");
-        confirmPkg.setOnClickListener(v -> selectTypedPackage());
-        chooseRow.addView(choose, lpWeight());
-        chooseRow.addView(confirmPkg, lpWeightWithLeft());
-        root.addView(chooseRow);
-
-        selectedLabel = text("尚未选择目标 App", 14, false);
-        selectedLabel.setPadding(0, dp(8), 0, dp(6));
-        root.addView(selectedLabel);
-
-        LinearLayout control1 = row();
-        Button start = button("开始记录");
-        start.setOnClickListener(v -> startCapture());
-        Button launch = button("打开目标 App");
-        launch.setOnClickListener(v -> launchTarget());
-        Button stop = button("停止");
-        stop.setOnClickListener(v -> stopCapture());
-        control1.addView(start, lpWeight());
-        control1.addView(launch, lpWeightWithLeft());
-        control1.addView(stop, lpWeightWithLeft());
-        root.addView(control1, lpMatchWrap(0, dp(8)));
-
-        LinearLayout control2 = row();
-        Button clear = button("清空屏幕");
-        clear.setOnClickListener(v -> { screenBuffer.setLength(0); logText.setText(""); });
-        Button snapshot = button("崩溃快照");
-        snapshot.setOnClickListener(v -> requestCrashSnapshot());
-        Button export = button("导出日志");
-        export.setOnClickListener(v -> exportLog());
-        control2.addView(clear, lpWeight());
-        control2.addView(snapshot, lpWeightWithLeft());
-        control2.addView(export, lpWeightWithLeft());
-        root.addView(control2);
-
-        statusText = text("提示：先启动 Shizuku 并授权本应用，再点“开始记录”，随后打开目标 App 复现问题。", 13, false);
-        statusText.setTextColor(0xFF444444);
-        statusText.setPadding(0, dp(10), 0, dp(8));
-        root.addView(statusText);
-
-        logText = text("", 11, false);
-        logText.setTypeface(Typeface.MONOSPACE);
-        logText.setTextIsSelectable(true);
-        logText.setPadding(dp(8), dp(8), dp(8), dp(8));
-        logText.setTextColor(0xFFEAEAEA);
-        logText.setBackgroundColor(0xFF161616);
-
-        logScroll = new ScrollView(this);
-        logScroll.setFillViewport(true);
-        logScroll.addView(logText, new ScrollView.LayoutParams(
-                ScrollView.LayoutParams.MATCH_PARENT, ScrollView.LayoutParams.WRAP_CONTENT));
-        root.addView(logScroll, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
-
-        return root;
+        findViewById(R.id.exportButton).setOnClickListener(v -> exportLog());
+        findViewById(R.id.snapshotButton).setOnClickListener(v -> {
+            requestCrashSnapshot();
+            setStatus("已请求补抓崩溃快照");
+        });
+        findViewById(R.id.clearButton).setOnClickListener(v -> {
+            screenBuffer.setLength(0);
+            logText.setText("预览已清空；日志文件不会被删除。");
+        });
     }
 
     private void refreshShizukuState() {
-        try {
-            if (!Shizuku.pingBinder()) {
-                permissionState.setText("Shizuku：未运行 / 未连接");
-                permissionState.setTextColor(0xFFB3261E);
-                return;
+        runOnUiThread(() -> {
+            try {
+                if (!Shizuku.pingBinder()) {
+                    updateShizukuUi("未运行 / 未连接", "—", false, true);
+                    return;
+                }
+                if (Shizuku.isPreV11()) {
+                    updateShizukuUi("版本过旧", "—", false, true);
+                    return;
+                }
+
+                if (Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED) {
+                    int uid = Shizuku.getUid();
+                    String mode = uid == 0 ? "Root" : "ADB Shell";
+                    updateShizukuUi("已授权", mode, true, false);
+                } else {
+                    updateShizukuUi("等待授权", "—", false, false);
+                }
+            } catch (Throwable e) {
+                updateShizukuUi("状态读取失败", "—", false, true);
             }
-            if (Shizuku.isPreV11()) {
-                permissionState.setText("Shizuku：版本过旧（需要 API 11+）");
-                permissionState.setTextColor(0xFFB3261E);
-                return;
-            }
-            int state = Shizuku.checkSelfPermission();
-            if (state == PackageManager.PERMISSION_GRANTED) {
-                int uid = Shizuku.getUid();
-                String mode = uid == 0 ? "Root" : "ADB Shell";
-                permissionState.setText("Shizuku：已连接并授权 ✓（" + mode + "）");
-                permissionState.setTextColor(0xFF137333);
-            } else {
-                permissionState.setText("Shizuku：已连接，等待授权");
-                permissionState.setTextColor(0xFFB06000);
-            }
-        } catch (Throwable e) {
-            permissionState.setText("Shizuku：状态读取失败");
-            permissionState.setTextColor(0xFFB3261E);
+        });
+    }
+
+    private void updateShizukuUi(String state, String backend, boolean success, boolean error) {
+        permissionState.setText(state);
+        backendText.setText(backend);
+
+        int textColor;
+        int chipBg;
+        String chipText;
+
+        if (success) {
+            textColor = getColor(R.color.status_success);
+            chipBg = getColor(R.color.status_success_container);
+            chipText = "✓ Shizuku 已连接";
+        } else if (error) {
+            textColor = getColor(R.color.status_error);
+            chipBg = getColor(R.color.status_error_container);
+            chipText = "Shizuku 未连接";
+        } else {
+            textColor = getColor(R.color.status_warning);
+            chipBg = getColor(R.color.status_warning_container);
+            chipText = "Shizuku 待授权";
         }
+
+        permissionState.setTextColor(textColor);
+        heroShizukuChip.setText(chipText);
+        heroShizukuChip.setTextColor(textColor);
+        heroShizukuChip.setChipBackgroundColor(
+                android.content.res.ColorStateList.valueOf(chipBg));
     }
 
     private boolean requestShizukuPermission(boolean startAfterGrant) {
@@ -241,30 +248,35 @@ public class MainActivity extends Activity {
         try {
             if (!Shizuku.pingBinder()) {
                 pendingStartAfterPermission = false;
-                new AlertDialog.Builder(this)
+                new MaterialAlertDialogBuilder(this)
                         .setTitle("Shizuku 尚未运行")
-                        .setMessage("请先打开 Shizuku，并通过无线调试/ADB 或 Root 启动 Shizuku 服务。启动后返回这里点“刷新状态”。")
-                        .setPositiveButton("打开 Shizuku", (d, w) -> openShizukuManager())
-                        .setNegativeButton("关闭", null)
+                        .setMessage("请先打开 Shizuku，并通过无线调试 / ADB 或 Root 启动服务。")
+                        .setPositiveButton("打开 Shizuku", (dialog, which) -> openShizukuManager())
+                        .setNegativeButton("取消", null)
                         .show();
                 return false;
             }
+
             if (Shizuku.isPreV11()) {
                 pendingStartAfterPermission = false;
                 toast("Shizuku 版本过旧，请更新");
                 return false;
             }
+
             if (Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED) {
                 pendingStartAfterPermission = false;
                 refreshShizukuState();
                 return true;
             }
+
             if (Shizuku.shouldShowRequestPermissionRationale()) {
-                new AlertDialog.Builder(this)
+                new MaterialAlertDialogBuilder(this)
                         .setTitle("需要 Shizuku 授权")
-                        .setMessage("本应用仅使用 Shizuku 的 shell 权限读取你主动选择的目标 App 的 logcat 日志。")
-                        .setPositiveButton("继续授权", (d, w) -> Shizuku.requestPermission(REQ_SHIZUKU_PERMISSION))
-                        .setNegativeButton("取消", (d, w) -> pendingStartAfterPermission = false)
+                        .setMessage("ShizuLog 仅使用 Shizuku 权限读取你主动选择目标应用的 Logcat 日志。")
+                        .setPositiveButton("继续授权",
+                                (dialog, which) -> Shizuku.requestPermission(REQ_SHIZUKU_PERMISSION))
+                        .setNegativeButton("取消",
+                                (dialog, which) -> pendingStartAfterPermission = false)
                         .show();
             } else {
                 Shizuku.requestPermission(REQ_SHIZUKU_PERMISSION);
@@ -273,7 +285,7 @@ public class MainActivity extends Activity {
         } catch (Throwable e) {
             pendingStartAfterPermission = false;
             refreshShizukuState();
-            toast("请求 Shizuku 授权失败: " + safeMessage(e));
+            toast("请求 Shizuku 授权失败：" + safeMessage(e));
             return false;
         }
     }
@@ -291,36 +303,42 @@ public class MainActivity extends Activity {
         PackageManager pm = getPackageManager();
         List<ApplicationInfo> installed = pm.getInstalledApplications(0);
         List<AppItem> items = new ArrayList<>();
+
         for (ApplicationInfo ai : installed) {
             if (ai.packageName.equals(getPackageName())) continue;
             Intent launch = pm.getLaunchIntentForPackage(ai.packageName);
             if (launch == null) continue;
+
             String label = String.valueOf(pm.getApplicationLabel(ai));
             items.add(new AppItem(label, ai.packageName, ai.uid));
         }
+
         Collator collator = Collator.getInstance(Locale.getDefault());
         items.sort((a, b) -> collator.compare(a.label, b.label));
+
         String[] display = new String[items.size()];
         for (int i = 0; i < items.size(); i++) {
-            AppItem x = items.get(i);
-            display[i] = x.label + "\n" + x.pkg;
+            AppItem item = items.get(i);
+            display[i] = item.label + "\n" + item.pkg;
         }
-        new AlertDialog.Builder(this)
-                .setTitle("选择目标 App")
-                .setItems(display, (d, which) -> {
-                    AppItem x = items.get(which);
-                    applyTarget(x.label, x.pkg);
+
+        new MaterialAlertDialogBuilder(this)
+                .setTitle("选择目标应用")
+                .setItems(display, (dialog, which) -> {
+                    AppItem item = items.get(which);
+                    applyTarget(item.label, item.pkg);
                 })
                 .setNegativeButton("取消", null)
                 .show();
     }
 
     private void selectTypedPackage() {
-        String pkg = packageInput.getText().toString().trim();
+        String pkg = textOf(packageInput).trim();
         if (pkg.isEmpty()) {
             toast("请输入包名");
             return;
         }
+
         try {
             ApplicationInfo ai = getPackageManager().getApplicationInfo(pkg, 0);
             String label = String.valueOf(getPackageManager().getApplicationLabel(ai));
@@ -334,12 +352,17 @@ public class MainActivity extends Activity {
         selectedPackage = pkg;
         selectedAppLabel = label;
         packageInput.setText(pkg);
+
         try {
             ApplicationInfo ai = getPackageManager().getApplicationInfo(pkg, 0);
-            selectedLabel.setText("目标：" + label + "\n包名：" + pkg + "\nUID：" + ai.uid);
+            selectedLabel.setText(label + "\n" + pkg + "\nUID " + ai.uid);
+            Drawable icon = getPackageManager().getApplicationIcon(ai);
+            targetAppIcon.setImageDrawable(icon);
         } catch (Exception e) {
-            selectedLabel.setText("目标：" + label + "\n包名：" + pkg);
+            selectedLabel.setText(label + "\n" + pkg);
+            targetAppIcon.setImageResource(android.R.drawable.sym_def_app_icon);
         }
+
         prefs().edit()
                 .putString(KEY_TARGET_PACKAGE, pkg)
                 .putString(KEY_TARGET_LABEL, label)
@@ -349,9 +372,10 @@ public class MainActivity extends Activity {
     private void startCapture() {
         selectTypedPackageSilently();
         if (selectedPackage.isEmpty()) {
-            toast("先选择目标 App");
+            toast("先选择目标应用");
             return;
         }
+
         if (!isShizukuReady()) {
             requestShizukuPermission(true);
             return;
@@ -372,52 +396,61 @@ public class MainActivity extends Activity {
     private void startCaptureInternal() {
         selectTypedPackageSilently();
         if (selectedPackage.isEmpty()) return;
+
         try {
             ApplicationInfo ai = getPackageManager().getApplicationInfo(selectedPackage, 0);
-            Intent s = new Intent(this, LogCaptureService.class)
+
+            Intent service = new Intent(this, LogCaptureService.class)
                     .setAction(LogCaptureService.ACTION_START)
                     .putExtra(LogCaptureService.EXTRA_PACKAGE, selectedPackage)
                     .putExtra(LogCaptureService.EXTRA_UID, ai.uid)
                     .putExtra(LogCaptureService.EXTRA_LABEL, selectedAppLabel);
-            startForegroundService(s);
+
+            startForegroundService(service);
+
             screenBuffer.setLength(0);
-            logText.setText("");
-            statusText.setText("已通过 Shizuku 启动日志采集，目标 UID=" + ai.uid + "。现在可以打开目标 App 复现问题。");
+            logText.setText("正在启动日志采集…");
+            setStatus("已启动日志采集，目标 UID=" + ai.uid + "。现在可以打开目标应用复现问题。");
         } catch (Exception e) {
-            toast("启动记录失败: " + e.getMessage());
+            toast("启动记录失败：" + safeMessage(e));
         }
     }
 
     private void selectTypedPackageSilently() {
-        String typed = packageInput.getText().toString().trim();
+        String typed = textOf(packageInput).trim();
         if (!typed.isEmpty() && !typed.equals(selectedPackage)) {
             try {
                 ApplicationInfo ai = getPackageManager().getApplicationInfo(typed, 0);
-                applyTarget(String.valueOf(getPackageManager().getApplicationLabel(ai)), typed);
-            } catch (Exception ignored) {}
+                String label = String.valueOf(getPackageManager().getApplicationLabel(ai));
+                applyTarget(label, typed);
+            } catch (Exception ignored) {
+            }
         }
     }
 
     private void launchTarget() {
         selectTypedPackageSilently();
         if (selectedPackage.isEmpty()) {
-            toast("先选择目标 App");
+            toast("先选择目标应用");
             return;
         }
+
         Intent launch = getPackageManager().getLaunchIntentForPackage(selectedPackage);
         if (launch == null) {
             toast("这个包没有可启动的主界面");
             return;
         }
+
         launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         prefs().edit().putBoolean(KEY_TARGET_LAUNCHED, true).apply();
         startActivity(launch);
     }
 
     private void stopCapture() {
-        Intent s = new Intent(this, LogCaptureService.class).setAction(LogCaptureService.ACTION_STOP);
-        startService(s);
-        statusText.setText("已请求停止记录");
+        Intent service = new Intent(this, LogCaptureService.class)
+                .setAction(LogCaptureService.ACTION_STOP);
+        startService(service);
+        setStatus("已请求停止记录");
     }
 
     private void exportLog() {
@@ -425,59 +458,84 @@ public class MainActivity extends Activity {
             toast("还没有可导出的日志文件");
             return;
         }
+
         String name = new File(currentLogPath).getName();
-        Intent i = new Intent(Intent.ACTION_CREATE_DOCUMENT)
+        Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT)
                 .addCategory(Intent.CATEGORY_OPENABLE)
                 .setType("text/plain")
                 .putExtra(Intent.EXTRA_TITLE, name);
-        startActivityForResult(i, REQ_CREATE_DOCUMENT);
+        startActivityForResult(intent, REQ_CREATE_DOCUMENT);
     }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode != REQ_CREATE_DOCUMENT || resultCode != RESULT_OK || data == null) return;
+
+        if (requestCode != REQ_CREATE_DOCUMENT
+                || resultCode != RESULT_OK
+                || data == null) {
+            return;
+        }
+
         Uri uri = data.getData();
         if (uri == null || currentLogPath == null) return;
+
         try (FileInputStream in = new FileInputStream(currentLogPath);
              OutputStream out = getContentResolver().openOutputStream(uri, "w")) {
             if (out == null) throw new IllegalStateException("无法打开导出位置");
-            byte[] buf = new byte[32 * 1024];
-            int n;
-            while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+
+            byte[] buffer = new byte[32 * 1024];
+            int count;
+            while ((count = in.read(buffer)) > 0) {
+                out.write(buffer, 0, count);
+            }
             out.flush();
             toast("日志已导出");
         } catch (Exception e) {
-            toast("导出失败: " + e.getMessage());
+            toast("导出失败：" + safeMessage(e));
         }
     }
 
     private void appendLog(String line) {
         if (line == null) return;
+
         screenBuffer.append(line).append('\n');
         if (screenBuffer.length() > MAX_SCREEN_CHARS) {
             int cut = screenBuffer.length() - MAX_SCREEN_CHARS;
-            int nl = screenBuffer.indexOf("\n", cut);
-            screenBuffer.delete(0, nl >= 0 ? nl + 1 : cut);
+            int newline = screenBuffer.indexOf("\n", cut);
+            screenBuffer.delete(0, newline >= 0 ? newline + 1 : cut);
         }
+
         logText.setText(screenBuffer);
         logScroll.post(() -> logScroll.fullScroll(View.FOCUS_DOWN));
+
+        appendedLineCounter++;
+        if (appendedLineCounter >= 25) {
+            appendedLineCounter = 0;
+            updateLogMeta();
+        }
     }
 
     private void registerStatusReceiver() {
-        IntentFilter f = new IntentFilter();
-        f.addAction(LogCaptureService.ACTION_LINE);
-        f.addAction(LogCaptureService.ACTION_STATUS);
+        IntentFilter filter = new IntentFilter();
+        filter.addAction(LogCaptureService.ACTION_LINE);
+        filter.addAction(LogCaptureService.ACTION_STATUS);
+
         if (Build.VERSION.SDK_INT >= 33) {
-            registerReceiver(receiver, f, Context.RECEIVER_NOT_EXPORTED);
+            registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED);
         } else {
-            registerReceiver(receiver, f);
+            registerReceiver(receiver, filter);
         }
     }
 
     private void requestNotificationPermissionIfNeeded() {
-        if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 99);
+        if (Build.VERSION.SDK_INT >= 33
+                && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(
+                    new String[]{Manifest.permission.POST_NOTIFICATIONS},
+                    99
+            );
         }
     }
 
@@ -487,9 +545,9 @@ public class MainActivity extends Activity {
         restoreUiState();
         refreshShizukuState();
 
-        SharedPreferences p = prefs();
-        if (p.getBoolean(KEY_TARGET_LAUNCHED, false)) {
-            p.edit().putBoolean(KEY_TARGET_LAUNCHED, false).apply();
+        SharedPreferences preferences = prefs();
+        if (preferences.getBoolean(KEY_TARGET_LAUNCHED, false)) {
+            preferences.edit().putBoolean(KEY_TARGET_LAUNCHED, false).apply();
             requestCrashSnapshot();
         }
     }
@@ -499,11 +557,16 @@ public class MainActivity extends Activity {
     }
 
     private void restoreUiState() {
-        if (packageInput == null || selectedLabel == null || statusText == null || logText == null) return;
+        if (packageInput == null
+                || selectedLabel == null
+                || statusText == null
+                || logText == null) {
+            return;
+        }
 
-        SharedPreferences p = prefs();
-        String pkg = p.getString(KEY_TARGET_PACKAGE, "");
-        String label = p.getString(KEY_TARGET_LABEL, "");
+        SharedPreferences preferences = prefs();
+        String pkg = preferences.getString(KEY_TARGET_PACKAGE, "");
+        String label = preferences.getString(KEY_TARGET_LABEL, "");
 
         if (pkg != null && !pkg.isEmpty()) {
             try {
@@ -511,29 +574,43 @@ public class MainActivity extends Activity {
                 if (label == null || label.isEmpty()) {
                     label = String.valueOf(getPackageManager().getApplicationLabel(ai));
                 }
+
                 selectedPackage = pkg;
                 selectedAppLabel = label;
                 packageInput.setText(pkg);
-                selectedLabel.setText("目标：" + label + "\n包名：" + pkg + "\nUID：" + ai.uid);
+                selectedLabel.setText(label + "\n" + pkg + "\nUID " + ai.uid);
+                targetAppIcon.setImageDrawable(getPackageManager().getApplicationIcon(ai));
             } catch (Exception e) {
                 selectedPackage = pkg;
                 selectedAppLabel = label == null ? "" : label;
                 packageInput.setText(pkg);
-                selectedLabel.setText("上次目标：" + selectedAppLabel + "\n包名：" + pkg + "\n（当前未找到安装包）");
+                selectedLabel.setText(
+                        "上次目标：" + selectedAppLabel
+                                + "\n" + pkg
+                                + "\n当前未找到安装包");
+                targetAppIcon.setImageResource(android.R.drawable.sym_def_app_icon);
             }
+        } else {
+            selectedLabel.setText("尚未选择目标应用");
+            targetAppIcon.setImageResource(android.R.drawable.sym_def_app_icon);
         }
 
-        String path = p.getString(KEY_CURRENT_LOG_PATH, null);
+        String path = preferences.getString(KEY_CURRENT_LOG_PATH, null);
         if (path != null && new File(path).isFile()) {
             currentLogPath = path;
             loadLogTail(path);
         }
 
-        String lastStatus = p.getString(KEY_LAST_STATUS, "");
+        String lastStatus = preferences.getString(KEY_LAST_STATUS, "");
+        boolean recording = preferences.getBoolean(KEY_RECORDING, false);
+
         if (lastStatus != null && !lastStatus.isEmpty()) {
-            boolean recording = p.getBoolean(KEY_RECORDING, false);
-            statusText.setText((recording ? "● 正在记录\n" : "") + lastStatus);
+            setStatus((recording ? "● 正在记录\n" : "") + lastStatus);
+        } else {
+            setStatus(recording ? "● 正在记录" : "等待开始记录");
         }
+
+        updateLogMeta();
     }
 
     private void loadLogTail(String path) {
@@ -551,102 +628,97 @@ public class MainActivity extends Activity {
                 remainingSkip -= skipped;
             }
 
-            int cap = (int) Math.min(maxBytes, Math.max(0L, file.length() - start));
-            byte[] data = new byte[Math.max(cap, 1)];
+            int capacity = (int) Math.min(
+                    maxBytes,
+                    Math.max(0L, file.length() - start)
+            );
+
+            byte[] data = new byte[Math.max(capacity, 1)];
             int total = 0;
-            int n;
-            while (total < data.length && (n = in.read(data, total, data.length - total)) > 0) {
-                total += n;
+            int count;
+            while (total < data.length
+                    && (count = in.read(data, total, data.length - total)) > 0) {
+                total += count;
             }
 
             String text = new String(data, 0, total, StandardCharsets.UTF_8);
             if (text.length() > MAX_SCREEN_CHARS) {
                 text = text.substring(text.length() - MAX_SCREEN_CHARS);
             }
+
             screenBuffer.setLength(0);
             screenBuffer.append(text);
-            logText.setText(text);
-            if (logScroll != null) logScroll.post(() -> logScroll.fullScroll(View.FOCUS_DOWN));
+            logText.setText(text.isEmpty() ? "暂无日志" : text);
+
+            logScroll.post(() -> logScroll.fullScroll(View.FOCUS_DOWN));
         } catch (Exception ignored) {
         }
     }
 
     private void requestCrashSnapshot() {
-        Intent s = new Intent(this, LogCaptureService.class)
+        Intent service = new Intent(this, LogCaptureService.class)
                 .setAction(LogCaptureService.ACTION_SNAPSHOT);
         try {
-            startService(s);
+            startService(service);
         } catch (Exception ignored) {
         }
     }
 
+    private void setStatus(String text) {
+        statusText.setText(text);
+    }
+
+    private void updateLogMeta() {
+        if (currentLogPath == null || currentLogPath.isEmpty()) {
+            logPathText.setText("日志路径：—");
+            logSizeText.setText("日志大小：0 B");
+            return;
+        }
+
+        File file = new File(currentLogPath);
+        logPathText.setText("日志路径：" + currentLogPath);
+        logSizeText.setText("日志大小：" + humanSize(file.isFile() ? file.length() : 0));
+    }
+
+    private static String humanSize(long bytes) {
+        if (bytes < 1024) return bytes + " B";
+        double kb = bytes / 1024.0;
+        if (kb < 1024) return String.format(Locale.US, "%.1f KB", kb);
+        return String.format(Locale.US, "%.2f MB", kb / 1024.0);
+    }
+
+    private static String textOf(TextInputEditText editText) {
+        return editText.getText() == null ? "" : editText.getText().toString();
+    }
+
     @Override
     protected void onDestroy() {
-        try { unregisterReceiver(receiver); } catch (Exception ignored) {}
+        try {
+            unregisterReceiver(receiver);
+        } catch (Exception ignored) {
+        }
+
         Shizuku.removeBinderReceivedListener(binderReceivedListener);
         Shizuku.removeBinderDeadListener(binderDeadListener);
         Shizuku.removeRequestPermissionResultListener(permissionResultListener);
+
         super.onDestroy();
     }
 
-    private TextView text(String s, int sp, boolean bold) {
-        TextView t = new TextView(this);
-        t.setText(s);
-        t.setTextSize(sp);
-        t.setTextColor(0xFF202124);
-        if (bold) t.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
-        return t;
+    private void toast(String text) {
+        Toast.makeText(this, text, Toast.LENGTH_SHORT).show();
     }
 
-    private Button button(String s) {
-        Button b = new Button(this);
-        b.setText(s);
-        b.setAllCaps(false);
-        b.setGravity(Gravity.CENTER);
-        return b;
-    }
-
-    private LinearLayout row() {
-        LinearLayout r = new LinearLayout(this);
-        r.setOrientation(LinearLayout.HORIZONTAL);
-        return r;
-    }
-
-    private LinearLayout.LayoutParams lpWeight() {
-        return new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
-    }
-
-    private LinearLayout.LayoutParams lpWeightWithLeft() {
-        LinearLayout.LayoutParams p = lpWeight();
-        p.leftMargin = dp(6);
-        return p;
-    }
-
-    private LinearLayout.LayoutParams lpMatchWrap(int top, int bottom) {
-        LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        p.topMargin = top;
-        p.bottomMargin = bottom;
-        return p;
-    }
-
-    private int dp(int v) {
-        return Math.round(v * getResources().getDisplayMetrics().density);
-    }
-
-    private void toast(String s) {
-        Toast.makeText(this, s, Toast.LENGTH_SHORT).show();
-    }
-
-    private static String safeMessage(Throwable e) {
-        String m = e.getMessage();
-        return m == null ? e.getClass().getSimpleName() : m;
+    private static String safeMessage(Throwable error) {
+        String message = error.getMessage();
+        return message == null ? error.getClass().getSimpleName() : message;
     }
 
     private static class AppItem {
         final String label;
         final String pkg;
         final int uid;
+
         AppItem(String label, String pkg, int uid) {
             this.label = label;
             this.pkg = pkg;

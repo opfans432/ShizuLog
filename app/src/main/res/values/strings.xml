@@ -1,5 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">ShizuLog</string>
     <string name="notification_channel">ShizuLog 日志记录</string>
     <string name="notification_title">正在记录 App 日志</string>
+
+    <string name="home_subtitle">基于 Shizuku 的 Android 日志记录工具</string>
+    <string name="section_connection">连接状态</string>
+    <string name="section_target">目标应用</string>
+    <string name="section_controls">记录控制</string>
+    <string name="section_status">当前状态</string>
+
+    <string name="request_shizuku">请求 Shizuku 授权</string>
+    <string name="open_shizuku">打开 Shizuku</string>
+    <string name="refresh_status">刷新状态</string>
+    <string name="choose_target">选择目标应用</string>
+    <string name="use_package">使用此包名</string>
+    <string name="package_hint">目标包名，例如 com.example.app</string>
+
+    <string name="start_recording">开始记录</string>
+    <string name="open_target">打开目标应用</string>
+    <string name="stop_recording">停止记录</string>
+    <string name="export_log">导出日志</string>
+    <string name="crash_snapshot">崩溃快照</string>
+    <string name="clear_screen">清空预览</string>
+
+    <string name="about_title">关于 ShizuLog</string>
+    <string name="about_intro_title">应用简介</string>
+    <string name="about_intro">ShizuLog 使用 Shizuku 提供的 Shell / Root 权限读取用户主动选择应用的 Logcat 日志，用于崩溃分析、异常排查和应用调试。日志会持续写入文件，并支持在界面重建后恢复当前目标和最近日志。</string>
+    <string name="about_features_title">主要功能</string>
+    <string name="about_features">✓ 选择目标应用\n✓ 实时记录 main / system / crash 日志\n✓ Shizuku 授权\n✓ 崩溃快照补抓\n✓ 会话状态恢复\n✓ 导出日志文件</string>
+    <string name="about_info_title">应用信息</string>
+    <string name="about_contributor">贡献者：ChatGPT</string>
+    <string name="about_license">许可证：MIT</string>
+    <string name="about_repo">GitHub 开源仓库</string>
+    <string name="about_icon_desc">ShizuLog 应用图标</string>
+
+    <string name="tip_home">建议先授权 Shizuku，再选择目标应用并开始记录。目标应用崩溃后返回 ShizuLog，会自动尝试补抓崩溃快照。</string>
 </resources>

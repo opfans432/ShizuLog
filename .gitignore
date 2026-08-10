@@ -5,3 +5,5 @@ local.properties
 /build/
 app/build/
 .DS_Store
+*.bak
+*.tmp
