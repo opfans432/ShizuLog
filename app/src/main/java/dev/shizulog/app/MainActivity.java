@@ -72,7 +72,11 @@ public class MainActivity extends AppCompatActivity {
     private static final int FILTER_ERROR = 2;
 
     private static final Pattern THREADTIME_PRIORITY = Pattern.compile(
-            "^\\s*\\d{2}-\\d{2}\\s+\\d{2}:\\d{2}:\\d{2}\\.\\d+\\s+\\d+\\s+\\d+\\s+([VDIWEF])\\s+"
+            "^\\s*\\d{2}-\\d{2}\\s+"
+                    + "\\d{2}:\\d{2}:\\d{2}\\.\\d+\\s+"
+                    + "(?:\\S+\\s+)?"
+                    + "\\d+\\s+\\d+\\s+"
+                    + "([VDIWEF])\\s+"
     );
 
     private final Handler uiHandler = new Handler(Looper.getMainLooper());
@@ -90,6 +94,7 @@ public class MainActivity extends AppCompatActivity {
     private TextView logEmptyTitle;
     private TextView logEmptyMessage;
     private TextView logFilterSummary;
+    private TextView recordStatsText;
     private ScrollView logScroll;
     private ScrollView mainScroll;
     private ImageView targetAppIcon;
@@ -159,6 +164,8 @@ public class MainActivity extends AppCompatActivity {
 
             if (LogCaptureService.ACTION_LINE.equals(action)) {
                 appendLog(intent.getStringExtra(LogCaptureService.EXTRA_LINE));
+            } else if (LogCaptureService.ACTION_STATS.equals(action)) {
+                updateRecordStats(intent);
             } else if (LogCaptureService.ACTION_STATUS.equals(action)) {
                 String status = intent.getStringExtra(LogCaptureService.EXTRA_STATUS);
                 String path = intent.getStringExtra(LogCaptureService.EXTRA_FILE);
@@ -222,6 +229,7 @@ public class MainActivity extends AppCompatActivity {
         captureModeMulti = findViewById(R.id.captureModeMulti);
         captureModeGlobal = findViewById(R.id.captureModeGlobal);
         logFilterSummary = findViewById(R.id.logFilterSummary);
+        recordStatsText = findViewById(R.id.recordStatsText);
         manualPackageContainer = findViewById(R.id.manualPackageContainer);
         manualPackageToggle = findViewById(R.id.manualPackageToggle);
         logEmptyState = findViewById(R.id.logEmptyState);
@@ -1115,6 +1123,12 @@ public class MainActivity extends AppCompatActivity {
 
             screenBuffer.setLength(0);
 
+            if (recordStatsText != null) {
+                recordStatsText.setText(
+                        "统计：等待日志…"
+                );
+            }
+
             showEmptyLogState(
                     "等待日志",
                     captureMode == CAPTURE_GLOBAL
@@ -1281,7 +1295,7 @@ public class MainActivity extends AppCompatActivity {
 
         boolean followTail = isLogNearBottom();
         screenBuffer.append(line);
-        if (!line.endsWith("\\n")) {
+        if (!line.endsWith("\n")) {
             screenBuffer.append('\n');
         }
 
@@ -1540,10 +1554,79 @@ public class MainActivity extends AppCompatActivity {
         startActivity(intent);
     }
 
+    private void updateRecordStats(Intent intent) {
+        if (recordStatsText == null) return;
+
+        long lines = intent.getLongExtra(
+                LogCaptureService.EXTRA_LINES,
+                0L
+        );
+
+        long warn = intent.getLongExtra(
+                LogCaptureService.EXTRA_WARN_COUNT,
+                0L
+        );
+
+        long error = intent.getLongExtra(
+                LogCaptureService.EXTRA_ERROR_COUNT,
+                0L
+        );
+
+        long bytes = intent.getLongExtra(
+                LogCaptureService.EXTRA_TOTAL_BYTES,
+                0L
+        );
+
+        long rate = intent.getLongExtra(
+                LogCaptureService.EXTRA_RATE,
+                0L
+        );
+
+        int pidCount = intent.getIntExtra(
+                LogCaptureService.EXTRA_PID_COUNT,
+                0
+        );
+
+        int part = intent.getIntExtra(
+                LogCaptureService.EXTRA_PART,
+                1
+        );
+
+        StringBuilder text = new StringBuilder();
+
+        text.append("统计：")
+                .append(lines)
+                .append(" 行")
+                .append(" · W ")
+                .append(warn)
+                .append(" · E ")
+                .append(error)
+                .append(" · ")
+                .append(rate)
+                .append(" 行/s")
+                .append(" · ")
+                .append(humanSize(bytes));
+
+        if (captureMode != CAPTURE_GLOBAL) {
+            text.append(" · PID ")
+                    .append(pidCount);
+        }
+
+        if (captureMode == CAPTURE_GLOBAL
+                && part > 1) {
+            text.append(" · 第 ")
+                    .append(part)
+                    .append(" 卷");
+        }
+
+        recordStatsText.setText(text.toString());
+    }
+
     private void registerStatusReceiver() {
         IntentFilter filter = new IntentFilter();
         filter.addAction(LogCaptureService.ACTION_LINE);
         filter.addAction(LogCaptureService.ACTION_STATUS);
+        filter.addAction(LogCaptureService.ACTION_STATS);
 
         if (Build.VERSION.SDK_INT >= 33) {
             registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED);

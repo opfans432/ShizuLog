@@ -26,6 +26,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.HashSet;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.concurrent.ExecutorService;
@@ -49,6 +52,8 @@ public class LogCaptureService extends Service {
             "dev.shizulog.app.LINE";
     public static final String ACTION_STATUS =
             "dev.shizulog.app.STATUS";
+    public static final String ACTION_STATS =
+            "dev.shizulog.app.STATS";
 
     public static final String EXTRA_MODE = "mode";
     public static final String EXTRA_PACKAGES = "packages";
@@ -63,6 +68,13 @@ public class LogCaptureService extends Service {
     public static final String EXTRA_LINE = "line";
     public static final String EXTRA_STATUS = "status";
     public static final String EXTRA_FILE = "file";
+    public static final String EXTRA_LINES = "lines";
+    public static final String EXTRA_WARN_COUNT = "warn_count";
+    public static final String EXTRA_ERROR_COUNT = "error_count";
+    public static final String EXTRA_TOTAL_BYTES = "total_bytes";
+    public static final String EXTRA_RATE = "rate";
+    public static final String EXTRA_PID_COUNT = "pid_count";
+    public static final String EXTRA_PART = "part";
 
     private static final String CHANNEL_ID = "log_capture";
     private static final int NOTIFICATION_ID = 1001;
@@ -72,10 +84,18 @@ public class LogCaptureService extends Service {
             Pattern.compile(
                     "^\\s*\\d{2}-\\d{2}\\s+"
                             + "\\d{2}:\\d{2}:\\d{2}\\.\\d+\\s+"
+                            + "(\\S+)\\s+"
                             + "(\\d+)\\s+"
-                            + "\\d+\\s+\\d+\\s+"
-                            + "[VDIWEF]\\s+"
+                            + "(\\d+)\\s+"
+                            + "([VDIWEF])\\s+"
             );
+
+    private static final long GLOBAL_PART_LIMIT_BYTES =
+            50L * 1024L * 1024L;
+
+    private static final long PID_KEEP_MS =
+            30_000L;
+
 
     private static final String PREFS = "shizulog_state";
     private static final String KEY_TARGET_PACKAGE = "target_package";
@@ -93,6 +113,15 @@ public class LogCaptureService extends Service {
 
     private final ExecutorService snapshotExecutor =
             Executors.newSingleThreadExecutor();
+
+    private final ExecutorService pidExecutor =
+            Executors.newSingleThreadExecutor();
+
+    private final AtomicLong captureGeneration =
+            new AtomicLong(0L);
+
+    private final ConcurrentHashMap<Integer, Long> trackedPids =
+            new ConcurrentHashMap<>();
 
     private final Object fileWriteLock = new Object();
 
@@ -381,15 +410,11 @@ public class LogCaptureService extends Service {
                 )
                 .putString(
                         KEY_SERVICE_PACKAGES,
-                        joinLines(
-                                currentPackages
-                        )
+                        joinLines(currentPackages)
                 )
                 .putString(
                         KEY_SERVICE_UIDS,
-                        joinUids(
-                                currentUids
-                        )
+                        joinUids(currentUids)
                 )
                 .putBoolean(
                         KEY_RECORDING,
@@ -397,20 +422,43 @@ public class LogCaptureService extends Service {
                 )
                 .apply();
 
+        trackedPids.clear();
+
+        long generation =
+                captureGeneration.incrementAndGet();
+
         running = true;
 
+        startPidTracker(
+                generation,
+                mode,
+                currentPackages
+        );
+
         executor.execute(() -> {
-            BufferedWriter writer = null;
+            SessionWriter sessionWriter = null;
 
             StringBuilder broadcastBuffer =
                     new StringBuilder();
 
             int linesSinceFlush = 0;
+
             long lastFileFlush =
                     System.currentTimeMillis();
 
             long lastBroadcast =
                     System.currentTimeMillis();
+
+            long lastStatsTime =
+                    System.currentTimeMillis();
+
+            long lastStatsLines = 0L;
+
+            long rawLineCount = 0L;
+            long keptLineCount = 0L;
+            long warnCount = 0L;
+            long errorCount = 0L;
+            long totalBytes = 0L;
 
             try {
                 ensureShizukuReady();
@@ -422,7 +470,6 @@ public class LogCaptureService extends Service {
 
                 if (!dir.exists()
                         && !dir.mkdirs()) {
-
                     throw new IllegalStateException(
                             "无法创建日志目录: "
                                     + dir
@@ -435,34 +482,24 @@ public class LogCaptureService extends Service {
                                 Locale.US
                         ).format(new Date());
 
-                String filePrefix;
+                String filePrefix =
+                        buildFilePrefix(
+                                mode,
+                                currentPackages
+                        );
 
-                if (mode == MODE_GLOBAL) {
-                    filePrefix = "global";
-                } else if (mode == MODE_MULTI) {
-                    filePrefix =
-                            "multi_"
-                                    + Math.max(
-                                            1,
-                                            packages.length
-                                    )
-                                    + "apps";
-                } else {
-                    filePrefix =
-                            packages.length > 0
-                                    ? sanitize(
-                                            packages[0]
-                                    )
-                                    : "single";
-                }
+                sessionWriter =
+                        openSessionWriter(
+                                dir,
+                                filePrefix,
+                                time,
+                                mode,
+                                currentPackages,
+                                1
+                        );
 
-                currentFile = new File(
-                        dir,
-                        filePrefix
-                                + "_"
-                                + time
-                                + ".log"
-                );
+                currentFile =
+                        sessionWriter.file;
 
                 prefs().edit()
                         .putString(
@@ -472,77 +509,19 @@ public class LogCaptureService extends Service {
                         )
                         .apply();
 
-                writer =
-                        new BufferedWriter(
-                                new OutputStreamWriter(
-                                        new FileOutputStream(
-                                                currentFile,
-                                                false
-                                        ),
-                                        StandardCharsets.UTF_8
-                                )
-                        );
-
-                writer.write("# ShizuLog\n");
-                writer.write(
-                        "# mode="
-                                + modeName(mode)
-                                + "\n"
-                );
-
-                writer.write(
-                        "# packages="
-                                + joinComma(packages)
-                                + "\n"
-                );
-
-                writer.write(
-                        "# uids="
-                                + joinUids(currentUids)
-                                + "\n"
-                );
-
-                writer.write(
-                        "# shizuku_uid="
-                                + Shizuku.getUid()
-                                + "\n"
-                );
-
-                writer.write(
-                        "# buffers=main,system,crash,events\n"
-                );
-
-                writer.write(
-                        "# filter_strategy="
-                                + (mode == MODE_GLOBAL
-                                ? "global"
-                                : "software_uid+package_context")
-                                + "\n"
-                );
-
-                writer.write(
-                        "# note=Logcat only contains messages actually written by apps/system; UI actions are not automatically logged.\n"
-                );
-
-                writer.write(
-                        "# started="
-                                + new Date()
-                                + "\n\n"
-                );
-
-                writer.flush();
-
                 String display =
                         buildDisplayLabel(
                                 mode,
-                                packages,
+                                currentPackages,
                                 labels
                         );
 
                 sendStatus(
                         mode == MODE_GLOBAL
-                                ? "已通过 Shizuku 开始全局 Logcat 记录"
-                                : "已通过 Shizuku 开始记录 " + display,
+                                ? "已通过 Shizuku 开始全局 Logcat 记录；单卷 50 MB 自动分卷"
+                                : "已通过 Shizuku 开始记录 "
+                                        + display
+                                        + "；已启用动态 PID / 多进程追踪",
                         currentFile
                 );
 
@@ -572,32 +551,63 @@ public class LogCaptureService extends Service {
                                      )
                              )) {
 
-                    String line;
-                    Set<Integer> targetUids = new HashSet<>();
+                    Set<Integer> targetUids =
+                            new HashSet<>();
+
                     for (int uid : currentUids) {
                         targetUids.add(uid);
                     }
 
-                    boolean keepContinuation = false;
-                    long rawLineCount = 0L;
-                    long keptLineCount = 0L;
+                    boolean keepContinuation =
+                            false;
+
+                    String line;
 
                     while (running
-                            && (line = reader.readLine()) != null) {
+                            && captureGeneration.get()
+                                    == generation
+                            && (line =
+                                    reader.readLine())
+                                    != null) {
 
                         rawLineCount++;
 
-                        boolean prefixed = UID_THREADTIME_PATTERN
-                                .matcher(line)
-                                .find();
+                        Matcher meta =
+                                UID_THREADTIME_PATTERN
+                                        .matcher(line);
 
-                        boolean keep = shouldKeepTargetLine(
-                                mode,
-                                line,
-                                targetUids,
-                                packages,
-                                keepContinuation
-                        );
+                        boolean prefixed =
+                                meta.find();
+
+                        if (prefixed) {
+                            Integer uid =
+                                    parseInteger(
+                                            meta.group(1)
+                                    );
+
+                            int pid =
+                                    safeParseInt(
+                                            meta.group(2),
+                                            -1
+                                    );
+
+                            if (uid != null
+                                    && targetUids
+                                            .contains(uid)
+                                    && pid >= 0) {
+
+                                rememberPid(pid);
+                            }
+                        }
+
+                        boolean keep =
+                                shouldKeepTargetLine(
+                                        mode,
+                                        line,
+                                        targetUids,
+                                        currentPackages,
+                                        keepContinuation
+                                );
 
                         if (prefixed) {
                             keepContinuation = keep;
@@ -609,44 +619,164 @@ public class LogCaptureService extends Service {
 
                         keptLineCount++;
 
+                        String priority =
+                                readPriority(line);
+
+                        if ("W".equals(priority)) {
+                            warnCount++;
+                        } else if ("E".equals(priority)
+                                || "F".equals(priority)) {
+                            errorCount++;
+                        }
+
+                        byte[] encoded =
+                                line.getBytes(
+                                        StandardCharsets.UTF_8
+                                );
+
+                        int lineBytes =
+                                encoded.length + 1;
+
                         synchronized (fileWriteLock) {
-                            writer.write(line);
-                            writer.newLine();
+                            sessionWriter.writer.write(line);
+                            sessionWriter.writer.newLine();
+
+                            sessionWriter.bytes +=
+                                    lineBytes;
+
+                            totalBytes +=
+                                    lineBytes;
 
                             linesSinceFlush++;
-                            long now = System.currentTimeMillis();
+
+                            long now =
+                                    System.currentTimeMillis();
 
                             if (linesSinceFlush >= 20
-                                    || now - lastFileFlush >= 250L) {
-                                writer.flush();
+                                    || now - lastFileFlush
+                                            >= 250L) {
+
+                                sessionWriter.writer.flush();
+
                                 linesSinceFlush = 0;
                                 lastFileFlush = now;
                             }
+
+                            if (mode == MODE_GLOBAL
+                                    && sessionWriter.bytes
+                                            >= GLOBAL_PART_LIMIT_BYTES) {
+
+                                sessionWriter.writer.flush();
+                                sessionWriter.writer.close();
+
+                                int nextPart =
+                                        sessionWriter.part + 1;
+
+                                sessionWriter =
+                                        openSessionWriter(
+                                                dir,
+                                                filePrefix,
+                                                time,
+                                                mode,
+                                                currentPackages,
+                                                nextPart
+                                        );
+
+                                currentFile =
+                                        sessionWriter.file;
+
+                                prefs().edit()
+                                        .putString(
+                                                KEY_CURRENT_LOG_PATH,
+                                                currentFile
+                                                        .getAbsolutePath()
+                                        )
+                                        .apply();
+
+                                sendStatus(
+                                        "全局日志已自动分卷：第 "
+                                                + nextPart
+                                                + " 卷",
+                                        currentFile
+                                );
+                            }
                         }
 
-                        broadcastBuffer.append(line).append('\n');
-                        long now = System.currentTimeMillis();
+                        broadcastBuffer
+                                .append(line)
+                                .append('\n');
 
-                        if (broadcastBuffer.length() >= 16 * 1024
-                                || now - lastBroadcast >= 80L) {
-                            sendLine(broadcastBuffer.toString());
-                            broadcastBuffer.setLength(0);
+                        long now =
+                                System.currentTimeMillis();
+
+                        if (broadcastBuffer.length()
+                                    >= 16 * 1024
+                                || now - lastBroadcast
+                                    >= 80L) {
+
+                            sendLine(
+                                    broadcastBuffer
+                                            .toString()
+                            );
+
+                            broadcastBuffer
+                                    .setLength(0);
+
                             lastBroadcast = now;
+                        }
+
+                        if (now - lastStatsTime
+                                >= 1000L) {
+
+                            long deltaLines =
+                                    keptLineCount
+                                            - lastStatsLines;
+
+                            long elapsed =
+                                    Math.max(
+                                            1L,
+                                            now
+                                                    - lastStatsTime
+                                    );
+
+                            long rate =
+                                    deltaLines
+                                            * 1000L
+                                            / elapsed;
+
+                            sendStats(
+                                    keptLineCount,
+                                    warnCount,
+                                    errorCount,
+                                    totalBytes,
+                                    rate,
+                                    getTrackedPidCount(),
+                                    sessionWriter.part
+                            );
+
+                            lastStatsLines =
+                                    keptLineCount;
+
+                            lastStatsTime = now;
                         }
                     }
 
                     if (mode != MODE_GLOBAL
                             && keptLineCount == 0
                             && rawLineCount > 0) {
+
                         sendStatus(
-                                "Logcat 正在工作，但当前没有匹配到目标应用日志。普通点击或游戏操作不会自动产生 Logcat，只有应用或系统实际写入的日志才会出现。",
+                                "Logcat 正在工作，但当前没有匹配到目标日志。ShizuLog 已同时使用 UID、动态 PID、多进程名和包名上下文过滤；如果仍为空，通常表示目标 App 本身几乎没有向 Logcat 写消息。",
                                 currentFile
                         );
                     }
                 }
 
                 synchronized (fileWriteLock) {
-                    writer.flush();
+                    if (sessionWriter != null
+                            && sessionWriter.writer != null) {
+                        sessionWriter.writer.flush();
+                    }
                 }
 
                 if (broadcastBuffer.length() > 0) {
@@ -655,7 +785,22 @@ public class LogCaptureService extends Service {
                     );
                 }
 
-                if (running) {
+                sendStats(
+                        keptLineCount,
+                        warnCount,
+                        errorCount,
+                        totalBytes,
+                        0L,
+                        getTrackedPidCount(),
+                        sessionWriter == null
+                                ? 1
+                                : sessionWriter.part
+                );
+
+                if (running
+                        && captureGeneration.get()
+                                == generation) {
+
                     int exit =
                             logcatProcess.waitFor();
 
@@ -677,6 +822,8 @@ public class LogCaptureService extends Service {
                 );
             } finally {
                 running = false;
+                captureGeneration
+                        .incrementAndGet();
 
                 prefs().edit()
                         .putBoolean(
@@ -685,9 +832,10 @@ public class LogCaptureService extends Service {
                         )
                         .apply();
 
-                if (writer != null) {
+                if (sessionWriter != null
+                        && sessionWriter.writer != null) {
                     try {
-                        writer.close();
+                        sessionWriter.writer.close();
                     } catch (Exception ignored) {}
                 }
 
@@ -707,6 +855,164 @@ public class LogCaptureService extends Service {
             }
         });
     }
+
+    private static final class SessionWriter {
+        BufferedWriter writer;
+        File file;
+        long bytes;
+        int part;
+    }
+
+    private SessionWriter openSessionWriter(
+            File dir,
+            String filePrefix,
+            String time,
+            int mode,
+            String[] packages,
+            int part
+    ) throws Exception {
+        SessionWriter out =
+                new SessionWriter();
+
+        String name;
+
+        if (mode == MODE_GLOBAL) {
+            name = filePrefix
+                    + "_"
+                    + time
+                    + "_part"
+                    + String.format(
+                            Locale.US,
+                            "%02d",
+                            part
+                    )
+                    + ".log";
+        } else {
+            name = filePrefix
+                    + "_"
+                    + time
+                    + ".log";
+        }
+
+        out.file =
+                new File(dir, name);
+
+        out.writer =
+                new BufferedWriter(
+                        new OutputStreamWriter(
+                                new FileOutputStream(
+                                        out.file,
+                                        false
+                                ),
+                                StandardCharsets.UTF_8
+                        )
+                );
+
+        out.part = part;
+
+        writeSessionHeader(
+                out.writer,
+                mode,
+                packages,
+                part
+        );
+
+        out.writer.flush();
+        out.bytes = out.file.length();
+
+        return out;
+    }
+
+    private void writeSessionHeader(
+            BufferedWriter writer,
+            int mode,
+            String[] packages,
+            int part
+    ) throws Exception {
+        writer.write("# ShizuLog\n");
+        writer.write(
+                "# mode="
+                        + modeName(mode)
+                        + "\n"
+        );
+        writer.write(
+                "# packages="
+                        + joinComma(packages)
+                        + "\n"
+        );
+        writer.write(
+                "# uids="
+                        + joinUids(currentUids)
+                        + "\n"
+        );
+        writer.write(
+                "# shizuku_uid="
+                        + Shizuku.getUid()
+                        + "\n"
+        );
+        writer.write(
+                "# buffers=main,system,crash,events\n"
+        );
+        writer.write(
+                "# filter_strategy="
+                        + (mode == MODE_GLOBAL
+                        ? "global"
+                        : "software_uid+dynamic_pid+process_name+package_context")
+                        + "\n"
+        );
+        writer.write(
+                "# pid_tracking="
+                        + (mode == MODE_GLOBAL
+                        ? "off"
+                        : "dynamic; multi-process; 30s grace")
+                        + "\n"
+        );
+
+        if (mode == MODE_GLOBAL) {
+            writer.write(
+                    "# rotation=50MB; part="
+                            + part
+                            + "\n"
+            );
+        }
+
+        writer.write(
+                "# note=Logcat only contains messages actually written by apps/system; UI actions are not automatically logged.\n"
+        );
+        writer.write(
+                "# started="
+                        + new Date()
+                        + "\n\n"
+        );
+    }
+
+    private static String buildFilePrefix(
+            int mode,
+            String[] packages
+    ) {
+        if (mode == MODE_GLOBAL) {
+            return "global";
+        }
+
+        if (mode == MODE_MULTI) {
+            return "multi_"
+                    + Math.max(
+                            1,
+                            packages == null
+                                    ? 0
+                                    : packages.length
+                    )
+                    + "apps";
+        }
+
+        if (packages != null
+                && packages.length > 0) {
+            return sanitize(packages[0]);
+        }
+
+        return "single";
+    }
+
 
     private void ensureShizukuReady() {
         if (!Shizuku.pingBinder()) {
@@ -735,9 +1041,6 @@ public class LogCaptureService extends Service {
             int mode,
             int[] uids
     ) {
-        // Do not use logcat --uid here. It strips system-owned context
-        // before ShizuLog can inspect it. We read the Shell-visible stream
-        // with UID metadata and filter it in Java.
         return "exec logcat"
                 + " -b main"
                 + " -b system"
@@ -748,7 +1051,7 @@ public class LogCaptureService extends Service {
                 + " 2>&1";
     }
 
-    private static boolean shouldKeepTargetLine(
+    private boolean shouldKeepTargetLine(
             int mode,
             String line,
             Set<Integer> targetUids,
@@ -763,31 +1066,385 @@ public class LogCaptureService extends Service {
             return keepContinuation;
         }
 
-        Matcher matcher = UID_THREADTIME_PATTERN.matcher(line);
+        Matcher matcher =
+                UID_THREADTIME_PATTERN
+                        .matcher(line);
+
         if (matcher.find()) {
-            try {
-                int uid = Integer.parseInt(matcher.group(1));
-                if (targetUids.contains(uid)) {
-                    return true;
+            Integer uid =
+                    parseInteger(
+                            matcher.group(1)
+                    );
+
+            int pid =
+                    safeParseInt(
+                            matcher.group(2),
+                            -1
+                    );
+
+            if (uid != null
+                    && targetUids.contains(uid)) {
+                if (pid >= 0) {
+                    rememberPid(pid);
                 }
-            } catch (Exception ignored) {}
+                return true;
+            }
+
+            if (pid >= 0
+                    && isTrackedPid(pid)) {
+                return true;
+            }
         } else if (keepContinuation) {
             return true;
         }
 
         if (packages != null) {
             for (String pkg : packages) {
-                if (pkg != null && !pkg.isEmpty() && line.contains(pkg)) {
+                if (pkg != null
+                        && !pkg.isEmpty()
+                        && line.contains(pkg)) {
                     return true;
                 }
+            }
+        }
+
+        return lineMentionsTrackedPid(line);
+    }
+
+    private static String readPriority(
+            String line
+    ) {
+        if (line == null) {
+            return "";
+        }
+
+        Matcher matcher =
+                UID_THREADTIME_PATTERN
+                        .matcher(line);
+
+        return matcher.find()
+                ? matcher.group(4)
+                : "";
+    }
+
+    private void rememberPid(int pid) {
+        if (pid < 0) return;
+
+        trackedPids.put(
+                pid,
+                System.currentTimeMillis()
+        );
+    }
+
+    private boolean isTrackedPid(int pid) {
+        Long seen =
+                trackedPids.get(pid);
+
+        if (seen == null) {
+            return false;
+        }
+
+        long now =
+                System.currentTimeMillis();
+
+        if (now - seen > PID_KEEP_MS) {
+            trackedPids.remove(pid, seen);
+            return false;
+        }
+
+        return true;
+    }
+
+    private boolean lineMentionsTrackedPid(
+            String line
+    ) {
+        if (line == null
+                || line.isEmpty()) {
+            return false;
+        }
+
+        long now =
+                System.currentTimeMillis();
+
+        for (Map.Entry<Integer, Long> entry :
+                trackedPids.entrySet()) {
+
+            if (now - entry.getValue()
+                    > PID_KEEP_MS) {
+                trackedPids.remove(
+                        entry.getKey(),
+                        entry.getValue()
+                );
+                continue;
+            }
+
+            if (containsNumberToken(
+                    line,
+                    entry.getKey()
+            )) {
+                return true;
             }
         }
 
         return false;
     }
 
+    private static boolean containsNumberToken(
+            String text,
+            int value
+    ) {
+        String token =
+                String.valueOf(value);
+
+        int from = 0;
+
+        while (true) {
+            int index =
+                    text.indexOf(
+                            token,
+                            from
+                    );
+
+            if (index < 0) {
+                return false;
+            }
+
+            int before =
+                    index - 1;
+
+            int after =
+                    index + token.length();
+
+            boolean leftOk =
+                    before < 0
+                            || !Character.isDigit(
+                                    text.charAt(before)
+                            );
+
+            boolean rightOk =
+                    after >= text.length()
+                            || !Character.isDigit(
+                                    text.charAt(after)
+                            );
+
+            if (leftOk && rightOk) {
+                return true;
+            }
+
+            from = index + 1;
+        }
+    }
+
+    private void startPidTracker(
+            long generation,
+            int mode,
+            String[] packages
+    ) {
+        if (mode == MODE_GLOBAL
+                || packages == null
+                || packages.length == 0) {
+            return;
+        }
+
+        final String[] targets =
+                packages.clone();
+
+        pidExecutor.execute(() -> {
+            while (running
+                    && captureGeneration.get()
+                            == generation) {
+
+                try {
+                    refreshTrackedPids(
+                            targets
+                    );
+                } catch (Throwable ignored) {}
+
+                try {
+                    Thread.sleep(1500L);
+                } catch (InterruptedException e) {
+                    Thread.currentThread()
+                            .interrupt();
+                    return;
+                }
+            }
+        });
+    }
+
+    private void refreshTrackedPids(
+            String[] packages
+    ) throws Exception {
+        ensureShizukuReady();
+
+        Process ps =
+                Shizuku.newProcess(
+                        new String[]{
+                                "/system/bin/sh",
+                                "-c",
+                                "ps -A -o PID,NAME 2>/dev/null || ps -A 2>/dev/null"
+                        },
+                        null,
+                        null
+                );
+
+        long now =
+                System.currentTimeMillis();
+
+        try (BufferedReader reader =
+                     new BufferedReader(
+                             new InputStreamReader(
+                                     ps.getInputStream(),
+                                     StandardCharsets.UTF_8
+                             )
+                     )) {
+
+            String line;
+
+            while ((line =
+                            reader.readLine())
+                            != null) {
+
+                String trimmed =
+                        line.trim();
+
+                if (trimmed.isEmpty()) {
+                    continue;
+                }
+
+                String[] parts =
+                        trimmed.split("\\s+");
+
+                if (parts.length < 2) {
+                    continue;
+                }
+
+                int pid =
+                        firstInteger(parts);
+
+                if (pid < 0) {
+                    continue;
+                }
+
+                String processName =
+                        parts[parts.length - 1];
+
+                if (matchesTargetProcess(
+                        processName,
+                        packages
+                )) {
+                    trackedPids.put(
+                            pid,
+                            now
+                    );
+                }
+            }
+        } finally {
+            try {
+                ps.destroy();
+            } catch (Throwable ignored) {}
+        }
+
+        pruneTrackedPids(now);
+    }
+
+    private static boolean matchesTargetProcess(
+            String processName,
+            String[] packages
+    ) {
+        if (processName == null
+                || packages == null) {
+            return false;
+        }
+
+        for (String pkg : packages) {
+            if (pkg == null
+                    || pkg.isEmpty()) {
+                continue;
+            }
+
+            if (processName.equals(pkg)
+                    || processName.startsWith(
+                            pkg + ":"
+                    )) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private void pruneTrackedPids(
+            long now
+    ) {
+        for (Map.Entry<Integer, Long> entry :
+                trackedPids.entrySet()) {
+
+            if (now - entry.getValue()
+                    > PID_KEEP_MS) {
+
+                trackedPids.remove(
+                        entry.getKey(),
+                        entry.getValue()
+                );
+            }
+        }
+    }
+
+    private int getTrackedPidCount() {
+        pruneTrackedPids(
+                System.currentTimeMillis()
+        );
+
+        return trackedPids.size();
+    }
+
+    private static int firstInteger(
+            String[] parts
+    ) {
+        for (String part : parts) {
+            Integer parsed =
+                    parseInteger(part);
+
+            if (parsed != null) {
+                return parsed;
+            }
+        }
+
+        return -1;
+    }
+
+    private static Integer parseInteger(
+            String value
+    ) {
+        if (value == null
+                || value.isEmpty()) {
+            return null;
+        }
+
+        try {
+            return Integer.parseInt(value);
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private static int safeParseInt(
+            String value,
+            int fallback
+    ) {
+        Integer parsed =
+                parseInteger(value);
+
+        return parsed == null
+                ? fallback
+                : parsed;
+    }
+
+
     private void stopCapture(String status) {
         running = false;
+        captureGeneration.incrementAndGet();
+        trackedPids.clear();
 
         Process p = logcatProcess;
 
@@ -815,6 +1472,59 @@ public class LogCaptureService extends Service {
         i.putExtra(
                 EXTRA_LINE,
                 chunk
+        );
+
+        sendBroadcast(i);
+    }
+
+    private void sendStats(
+            long lines,
+            long warnCount,
+            long errorCount,
+            long totalBytes,
+            long rate,
+            int pidCount,
+            int part
+    ) {
+        Intent i =
+                new Intent(ACTION_STATS)
+                        .setPackage(
+                                getPackageName()
+                        );
+
+        i.putExtra(
+                EXTRA_LINES,
+                lines
+        );
+
+        i.putExtra(
+                EXTRA_WARN_COUNT,
+                warnCount
+        );
+
+        i.putExtra(
+                EXTRA_ERROR_COUNT,
+                errorCount
+        );
+
+        i.putExtra(
+                EXTRA_TOTAL_BYTES,
+                totalBytes
+        );
+
+        i.putExtra(
+                EXTRA_RATE,
+                rate
+        );
+
+        i.putExtra(
+                EXTRA_PID_COUNT,
+                pidCount
+        );
+
+        i.putExtra(
+                EXTRA_PART,
+                part
         );
 
         sendBroadcast(i);
@@ -1470,6 +2180,7 @@ public class LogCaptureService extends Service {
         stopCapture(null);
         executor.shutdownNow();
         snapshotExecutor.shutdownNow();
+        pidExecutor.shutdownNow();
         super.onDestroy();
     }
 

@@ -413,7 +413,7 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="4dp"
-                            android:text="记录 Shizuku 当前权限可读取的 main / system / crash 日志，不按 App UID 过滤。日志量可能非常大，也可能包含其他应用或系统的敏感信息。"
+                            android:text="记录 Shizuku 当前权限可读取的 main / system / crash / events 日志，不按 App UID 过滤。日志量可能非常大，也可能包含其他应用或系统的敏感信息；单卷达到 50 MB 后会自动分卷。"
                             android:textColor="@color/md_theme_onSurface"
                             android:textSize="13sp" />
                     </LinearLayout>
@@ -595,6 +595,15 @@
                         android:text="日志大小：0 B"
                         android:textColor="@color/md_theme_onSurfaceVariant"
                         android:textSize="13sp" />
+
+                    <TextView
+                        android:id="@+id/recordStatsText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="3dp"
+                        android:text="统计：—"
+                        android:textColor="@color/md_theme_onSurfaceVariant"
+                        android:textSize="12sp" />
 
                     <LinearLayout
                         android:layout_width="match_parent"
