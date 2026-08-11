@@ -624,7 +624,7 @@ public class LogCaptureService extends Service {
                             }
                         }
 
-                        broadcastBuffer.append(line).append('\\n');
+                        broadcastBuffer.append(line).append('\n');
                         long now = System.currentTimeMillis();
 
                         if (broadcastBuffer.length() >= 16 * 1024
