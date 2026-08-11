@@ -64,6 +64,7 @@ public class MainActivity extends AppCompatActivity {
     private ScrollView logScroll;
     private ImageView targetAppIcon;
     private Chip heroShizukuChip;
+    private AppPickerDialog appPickerDialog;
 
     private String selectedPackage = "";
     private String selectedAppLabel = "";
@@ -300,36 +301,24 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void showAppPicker() {
-        PackageManager pm = getPackageManager();
-        List<ApplicationInfo> installed = pm.getInstalledApplications(0);
-        List<AppItem> items = new ArrayList<>();
-
-        for (ApplicationInfo ai : installed) {
-            if (ai.packageName.equals(getPackageName())) continue;
-            Intent launch = pm.getLaunchIntentForPackage(ai.packageName);
-            if (launch == null) continue;
-
-            String label = String.valueOf(pm.getApplicationLabel(ai));
-            items.add(new AppItem(label, ai.packageName, ai.uid));
+        // 从点击开始就占用这个引用，因此即使用户在 Dialog 真正 show()
+        // 之前连续点击，也不会创建第二个窗口。
+        if (appPickerDialog != null || isFinishing() || isDestroyed()) {
+            return;
         }
 
-        Collator collator = Collator.getInstance(Locale.getDefault());
-        items.sort((a, b) -> collator.compare(a.label, b.label));
+        try {
+            appPickerDialog = new AppPickerDialog(
+                    this,
+                    (label, packageName) -> applyTarget(label, packageName)
+            );
 
-        String[] display = new String[items.size()];
-        for (int i = 0; i < items.size(); i++) {
-            AppItem item = items.get(i);
-            display[i] = item.label + "\n" + item.pkg;
+            appPickerDialog.setOnDismissListener(dialog -> appPickerDialog = null);
+            appPickerDialog.show();
+        } catch (Throwable error) {
+            appPickerDialog = null;
+            toast("打开应用选择器失败：" + safeMessage(error));
         }
-
-        new MaterialAlertDialogBuilder(this)
-                .setTitle("选择目标应用")
-                .setItems(display, (dialog, which) -> {
-                    AppItem item = items.get(which);
-                    applyTarget(item.label, item.pkg);
-                })
-                .setNegativeButton("取消", null)
-                .show();
     }
 
     private void selectTypedPackage() {
@@ -693,6 +682,14 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
+        if (appPickerDialog != null) {
+            try {
+                appPickerDialog.dismiss();
+            } catch (Throwable ignored) {
+            }
+            appPickerDialog = null;
+        }
+
         try {
             unregisterReceiver(receiver);
         } catch (Exception ignored) {
