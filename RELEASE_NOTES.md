@@ -1,38 +1,19 @@
-# ShizuLog v1.4.0
+# ShizuLog v1.4.1
 
-## 新增记录范围
+## 修复：多应用“打开目标应用”
+- 多应用模式重新启用“打开所选应用”
+- 点击后弹出已选择 App 列表，选择其中一个即可启动
+- 记录进行中仍可打开目标 App，恢复“先开始记录 → 再打开 App 复现”的正常流程
 
-ShizuLog 现在支持三种记录模式：
+## 修复：多应用日志几乎为空
+- 不再使用 `logcat --uid=...` 作为唯一过滤
+- 改为读取 Shizuku Shell 当前可见 Logcat，再由 ShizuLog 软件过滤
+- 保留目标 UID 自己写出的日志
+- 同时保留消息中提到目标包名的系统日志
+- 新增 `events` buffer，提高进程、Activity、任务等系统事件的可见性
+- Logcat 输出加入 UID 字段
 
-- **单应用**：按一个目标 App 的 UID 过滤 Logcat
-- **多应用**：同时选择多个 App，按多个 UID 合并过滤
-- **全局**：不使用 UID 过滤，记录 Shizuku 当前权限可以读取的 main / system / crash Logcat
+## 诊断
+新日志文件头会显示 `buffers=main,system,crash,events` 与 `filter_strategy=software_uid+package_context`。
 
-## 多应用记录
-
-- 新增可搜索的多选 App Picker
-- 支持按应用名称或包名搜索
-- 支持勾选任意数量的应用
-- 已选择应用会持久化保存
-- 相同 UID 会自动去重
-- 多应用模式使用 Android logcat 原生的逗号分隔 `--uid=UID1,UID2,...` 过滤
-
-## 全局 Logcat
-
-- 无需选择目标 App
-- 开始记录前显示风险确认
-- 文件名使用 `global_时间.log`
-- 全局模式仍支持历史日志、完整日志、搜索、WARN+ / ERROR 筛选和崩溃快照
-- 全局模式仅代表“不按 App UID 过滤”；实际可读取范围仍受 Android ROM 与 Shizuku Shell / Root 权限控制
-
-## 性能
-
-- LogCaptureService 改为批量向界面发送实时日志，降低全局记录时的 Broadcast / UI 压力
-- 日志文件写入改为短周期批量 flush，减少高频全局日志的磁盘 I/O
-- 完整原始日志仍持续保存到文件
-
-## 崩溃快照
-
-- 单应用、多应用会优先补抓目标 UID 的近期日志
-- 同时尝试补抓 AndroidRuntime / ActivityManager 等系统侧关联信息
-- 全局模式会补抓近期全局 crash 与关键错误日志
+注意：Logcat 不会自动记录每一次点击、游戏操作或业务动作；只有 App 或 Android 系统实际写入日志缓冲区的内容才能被记录。

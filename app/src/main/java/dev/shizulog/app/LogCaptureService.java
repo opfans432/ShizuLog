@@ -25,6 +25,9 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.HashSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -63,6 +66,16 @@ public class LogCaptureService extends Service {
 
     private static final String CHANNEL_ID = "log_capture";
     private static final int NOTIFICATION_ID = 1001;
+
+
+    private static final Pattern UID_THREADTIME_PATTERN =
+            Pattern.compile(
+                    "^\\s*\\d{2}-\\d{2}\\s+"
+                            + "\\d{2}:\\d{2}:\\d{2}\\.\\d+\\s+"
+                            + "(\\d+)\\s+"
+                            + "\\d+\\s+\\d+\\s+"
+                            + "[VDIWEF]\\s+"
+            );
 
     private static final String PREFS = "shizulog_state";
     private static final String KEY_TARGET_PACKAGE = "target_package";
@@ -496,6 +509,22 @@ public class LogCaptureService extends Service {
                 );
 
                 writer.write(
+                        "# buffers=main,system,crash,events\n"
+                );
+
+                writer.write(
+                        "# filter_strategy="
+                                + (mode == MODE_GLOBAL
+                                ? "global"
+                                : "software_uid+package_context")
+                                + "\n"
+                );
+
+                writer.write(
+                        "# note=Logcat only contains messages actually written by apps/system; UI actions are not automatically logged.\n"
+                );
+
+                writer.write(
                         "# started="
                                 + new Date()
                                 + "\n\n"
@@ -544,52 +573,75 @@ public class LogCaptureService extends Service {
                              )) {
 
                     String line;
+                    Set<Integer> targetUids = new HashSet<>();
+                    for (int uid : currentUids) {
+                        targetUids.add(uid);
+                    }
+
+                    boolean keepContinuation = false;
+                    long rawLineCount = 0L;
+                    long keptLineCount = 0L;
 
                     while (running
-                            && (line =
-                                    reader.readLine())
-                                    != null) {
+                            && (line = reader.readLine()) != null) {
+
+                        rawLineCount++;
+
+                        boolean prefixed = UID_THREADTIME_PATTERN
+                                .matcher(line)
+                                .find();
+
+                        boolean keep = shouldKeepTargetLine(
+                                mode,
+                                line,
+                                targetUids,
+                                packages,
+                                keepContinuation
+                        );
+
+                        if (prefixed) {
+                            keepContinuation = keep;
+                        }
+
+                        if (!keep) {
+                            continue;
+                        }
+
+                        keptLineCount++;
 
                         synchronized (fileWriteLock) {
                             writer.write(line);
                             writer.newLine();
 
                             linesSinceFlush++;
-
-                            long now =
-                                    System.currentTimeMillis();
+                            long now = System.currentTimeMillis();
 
                             if (linesSinceFlush >= 20
-                                    || now - lastFileFlush
-                                            >= 250L) {
-
+                                    || now - lastFileFlush >= 250L) {
                                 writer.flush();
-
                                 linesSinceFlush = 0;
                                 lastFileFlush = now;
                             }
                         }
 
-                        broadcastBuffer
-                                .append(line)
-                                .append('\n');
+                        broadcastBuffer.append(line).append('\\n');
+                        long now = System.currentTimeMillis();
 
-                        long now =
-                                System.currentTimeMillis();
-
-                        if (broadcastBuffer.length()
-                                    >= 16 * 1024
-                                || now - lastBroadcast
-                                    >= 80L) {
-
-                            sendLine(
-                                    broadcastBuffer
-                                            .toString()
-                            );
-
+                        if (broadcastBuffer.length() >= 16 * 1024
+                                || now - lastBroadcast >= 80L) {
+                            sendLine(broadcastBuffer.toString());
                             broadcastBuffer.setLength(0);
                             lastBroadcast = now;
                         }
+                    }
+
+                    if (mode != MODE_GLOBAL
+                            && keptLineCount == 0
+                            && rawLineCount > 0) {
+                        sendStatus(
+                                "Logcat 正在工作，但当前没有匹配到目标应用日志。普通点击或游戏操作不会自动产生 Logcat，只有应用或系统实际写入的日志才会出现。",
+                                currentFile
+                        );
                     }
                 }
 
@@ -683,30 +735,55 @@ public class LogCaptureService extends Service {
             int mode,
             int[] uids
     ) {
-        StringBuilder cmd =
-                new StringBuilder(
-                        "exec logcat"
-                                + " -b main"
-                                + " -b system"
-                                + " -b crash"
-                );
+        // Do not use logcat --uid here. It strips system-owned context
+        // before ShizuLog can inspect it. We read the Shell-visible stream
+        // with UID metadata and filter it in Java.
+        return "exec logcat"
+                + " -b main"
+                + " -b system"
+                + " -b crash"
+                + " -b events"
+                + " -v threadtime,uid"
+                + " -T 1"
+                + " 2>&1";
+    }
 
-        if (mode != MODE_GLOBAL
-                && uids.length > 0) {
-
-            cmd.append(" --uid=")
-                    .append(
-                            joinUids(uids)
-                    );
+    private static boolean shouldKeepTargetLine(
+            int mode,
+            String line,
+            Set<Integer> targetUids,
+            String[] packages,
+            boolean keepContinuation
+    ) {
+        if (mode == MODE_GLOBAL) {
+            return true;
         }
 
-        cmd.append(
-                " -v threadtime"
-                        + " -T 1"
-                        + " 2>&1"
-        );
+        if (line == null || line.isEmpty()) {
+            return keepContinuation;
+        }
 
-        return cmd.toString();
+        Matcher matcher = UID_THREADTIME_PATTERN.matcher(line);
+        if (matcher.find()) {
+            try {
+                int uid = Integer.parseInt(matcher.group(1));
+                if (targetUids.contains(uid)) {
+                    return true;
+                }
+            } catch (Exception ignored) {}
+        } else if (keepContinuation) {
+            return true;
+        }
+
+        if (packages != null) {
+            for (String pkg : packages) {
+                if (pkg != null && !pkg.isEmpty() && line.contains(pkg)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     private void stopCapture(String status) {

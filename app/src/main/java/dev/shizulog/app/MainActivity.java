@@ -380,6 +380,14 @@ public class MainActivity extends AppCompatActivity {
                 mode == CAPTURE_GLOBAL
         );
 
+        if (mode == CAPTURE_MULTI) {
+            openTargetButton.setText("打开所选应用");
+        } else {
+            openTargetButton.setText(
+                    getString(R.string.open_target)
+            );
+        }
+
         if (persist) {
             prefs().edit()
                     .putInt(
@@ -651,9 +659,10 @@ public class MainActivity extends AppCompatActivity {
         );
 
         openTargetButton.setEnabled(
-                captureMode == CAPTURE_SINGLE
-                        && hasSingleTarget
-                        && !recording
+                (captureMode == CAPTURE_SINGLE
+                        && hasSingleTarget)
+                        || (captureMode == CAPTURE_MULTI
+                        && hasMultiTargets)
         );
 
         stopButton.setEnabled(recording);
@@ -1146,8 +1155,13 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void launchTarget() {
-        if (captureMode != CAPTURE_SINGLE) {
-            toast("只有单应用模式可以直接打开目标应用");
+        if (captureMode == CAPTURE_GLOBAL) {
+            toast("全局模式没有单独的目标应用");
+            return;
+        }
+
+        if (captureMode == CAPTURE_MULTI) {
+            launchOneOfMultiTargets();
             return;
         }
 
@@ -1158,16 +1172,50 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
+        launchPackage(selectedPackage);
+    }
+
+    private void launchOneOfMultiTargets() {
+        if (selectedMultiPackages.isEmpty()) {
+            toast("先选择至少一个应用");
+            return;
+        }
+
+        List<String> packages =
+                new ArrayList<>(selectedMultiPackages);
+
+        String[] labels = new String[packages.size()];
+
+        for (int i = 0; i < packages.size(); i++) {
+            labels[i] = getAppLabelOrPackage(packages.get(i));
+        }
+
+        new MaterialAlertDialogBuilder(this)
+                .setTitle("打开哪个应用？")
+                .setItems(
+                        labels,
+                        (dialog, which) ->
+                                launchPackage(packages.get(which))
+                )
+                .setNegativeButton("取消", null)
+                .show();
+    }
+
+    private void launchPackage(String packageName) {
         Intent launch = getPackageManager()
-                .getLaunchIntentForPackage(selectedPackage);
+                .getLaunchIntentForPackage(packageName);
 
         if (launch == null) {
-            toast("这个包没有可启动的主界面");
+            toast("这个应用没有可启动的主界面");
             return;
         }
 
         launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        prefs().edit().putBoolean(KEY_TARGET_LAUNCHED, true).apply();
+
+        prefs().edit()
+                .putBoolean(KEY_TARGET_LAUNCHED, true)
+                .apply();
+
         startActivity(launch);
     }
 
