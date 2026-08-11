@@ -51,12 +51,10 @@ final class AppPickerDialog extends Dialog {
     private static final Object CACHE_LOCK = new Object();
     private static List<AppEntry> cachedApps;
     private static long cacheLoadedAtMs;
-
     private static final LruCache<String, Drawable> ICON_CACHE = new LruCache<>(96);
 
     private final Context appContext;
     private final Listener listener;
-
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final ExecutorService appLoader = Executors.newSingleThreadExecutor();
     private final ExecutorService iconLoader = Executors.newFixedThreadPool(2);
@@ -70,7 +68,6 @@ final class AppPickerDialog extends Dialog {
 
     private AppAdapter adapter;
     private final List<AppEntry> allApps = new ArrayList<>();
-
     private Runnable pendingFilter;
     private volatile boolean closed;
 
@@ -108,15 +105,13 @@ final class AppPickerDialog extends Dialog {
         appList.setOnItemClickListener((parent, view, position, id) -> {
             AppEntry item = adapter.getItem(position);
             if (item == null) return;
-
             listener.onAppSelected(item.label, item.packageName);
             dismiss();
         });
 
         searchInput.addTextChangedListener(new TextWatcher() {
             @Override
-            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
-            }
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
 
             @Override
             public void onTextChanged(CharSequence s, int start, int before, int count) {
@@ -124,8 +119,7 @@ final class AppPickerDialog extends Dialog {
             }
 
             @Override
-            public void afterTextChanged(Editable s) {
-            }
+            public void afterTextChanged(Editable s) {}
         });
 
         loadAppsFast();
@@ -134,14 +128,12 @@ final class AppPickerDialog extends Dialog {
     @Override
     protected void onStart() {
         super.onStart();
-
         Window window = getWindow();
         if (window == null) return;
 
         DisplayMetrics metrics = getContext().getResources().getDisplayMetrics();
         int width = Math.min((int) (metrics.widthPixels * 0.94f), dpToPx(620));
         int height = Math.min((int) (metrics.heightPixels * 0.82f), dpToPx(760));
-
         window.setLayout(width, height);
         window.setSoftInputMode(
                 WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
@@ -151,21 +143,15 @@ final class AppPickerDialog extends Dialog {
 
     @Override
     public void dismiss() {
-        if (closed) {
-            super.dismiss();
-            return;
+        if (!closed) {
+            closed = true;
+            if (pendingFilter != null) {
+                mainHandler.removeCallbacks(pendingFilter);
+                pendingFilter = null;
+            }
+            appLoader.shutdownNow();
+            iconLoader.shutdownNow();
         }
-
-        closed = true;
-
-        if (pendingFilter != null) {
-            mainHandler.removeCallbacks(pendingFilter);
-            pendingFilter = null;
-        }
-
-        appLoader.shutdownNow();
-        iconLoader.shutdownNow();
-
         super.dismiss();
     }
 
@@ -176,10 +162,7 @@ final class AppPickerDialog extends Dialog {
         if (cache != null && !cache.isEmpty()) {
             setApps(cache);
             showLoading(false);
-
-            if (!cacheFresh) {
-                refreshAppsInBackground(false);
-            }
+            if (!cacheFresh) refreshAppsInBackground(false);
             return;
         }
 
@@ -191,7 +174,6 @@ final class AppPickerDialog extends Dialog {
         appLoader.execute(() -> {
             try {
                 List<AppEntry> loaded = queryLauncherApps();
-
                 synchronized (CACHE_LOCK) {
                     cachedApps = new ArrayList<>(loaded);
                     cacheLoadedAtMs = System.currentTimeMillis();
@@ -205,7 +187,6 @@ final class AppPickerDialog extends Dialog {
             } catch (Throwable error) {
                 mainHandler.post(() -> {
                     if (closed || !isShowing()) return;
-
                     if (showBlockingLoading || allApps.isEmpty()) {
                         showLoading(false);
                         emptyText.setText("读取应用列表失败");
@@ -220,7 +201,6 @@ final class AppPickerDialog extends Dialog {
 
     private List<AppEntry> queryLauncherApps() {
         PackageManager pm = appContext.getPackageManager();
-
         Intent launcherIntent = new Intent(Intent.ACTION_MAIN);
         launcherIntent.addCategory(Intent.CATEGORY_LAUNCHER);
 
@@ -238,11 +218,10 @@ final class AppPickerDialog extends Dialog {
 
             if (packageName == null
                     || packageName.isEmpty()
-                    || packageName.equals(appContext.getPackageName())) {
+                    || packageName.equals(appContext.getPackageName())
+                    || unique.containsKey(packageName)) {
                 continue;
             }
-
-            if (unique.containsKey(packageName)) continue;
 
             CharSequence loadedLabel = info.loadLabel(pm);
             String label = loadedLabel == null
@@ -251,10 +230,7 @@ final class AppPickerDialog extends Dialog {
 
             if (label.isEmpty()) label = packageName;
 
-            unique.put(
-                    packageName,
-                    new AppEntry(label, packageName, applicationInfo.uid)
-            );
+            unique.put(packageName, new AppEntry(label, packageName));
         }
 
         List<AppEntry> result = new ArrayList<>(unique.values());
@@ -265,22 +241,17 @@ final class AppPickerDialog extends Dialog {
             if (byLabel != 0) return byLabel;
             return left.packageName.compareToIgnoreCase(right.packageName);
         });
-
         return result;
     }
 
     private void scheduleFilter(String query) {
-        if (pendingFilter != null) {
-            mainHandler.removeCallbacks(pendingFilter);
-        }
-
+        if (pendingFilter != null) mainHandler.removeCallbacks(pendingFilter);
         final String requested = query == null ? "" : query;
 
         pendingFilter = () -> {
             pendingFilter = null;
             filterNow(requested);
         };
-
         mainHandler.postDelayed(pendingFilter, 120L);
     }
 
@@ -309,19 +280,14 @@ final class AppPickerDialog extends Dialog {
     }
 
     private static String normalize(String value) {
-        if (value == null) return "";
-        return value.trim().toLowerCase(Locale.ROOT);
+        return value == null ? "" : value.trim().toLowerCase(Locale.ROOT);
     }
 
     private void setApps(List<AppEntry> apps) {
         allApps.clear();
         allApps.addAll(apps);
-
-        String currentQuery = searchInput.getText() == null
-                ? ""
-                : searchInput.getText().toString();
-
-        filterNow(currentQuery);
+        String query = searchInput.getText() == null ? "" : searchInput.getText().toString();
+        filterNow(query);
     }
 
     private void showLoading(boolean loading) {
@@ -339,8 +305,7 @@ final class AppPickerDialog extends Dialog {
 
     private List<AppEntry> getCachedApps() {
         synchronized (CACHE_LOCK) {
-            if (cachedApps == null) return null;
-            return new ArrayList<>(cachedApps);
+            return cachedApps == null ? null : new ArrayList<>(cachedApps);
         }
     }
 
@@ -352,8 +317,7 @@ final class AppPickerDialog extends Dialog {
     }
 
     private int dpToPx(int dp) {
-        float density = getContext().getResources().getDisplayMetrics().density;
-        return Math.round(dp * density);
+        return Math.round(dp * getContext().getResources().getDisplayMetrics().density);
     }
 
     private final class AppAdapter extends BaseAdapter {
@@ -366,15 +330,12 @@ final class AppPickerDialog extends Dialog {
             notifyDataSetChanged();
         }
 
-        @Override
-        public int getCount() {
-            return visibleApps.size();
-        }
+        @Override public int getCount() { return visibleApps.size(); }
 
         @Override
         public AppEntry getItem(int position) {
-            if (position < 0 || position >= visibleApps.size()) return null;
-            return visibleApps.get(position);
+            return position < 0 || position >= visibleApps.size()
+                    ? null : visibleApps.get(position);
         }
 
         @Override
@@ -389,7 +350,6 @@ final class AppPickerDialog extends Dialog {
 
             if (convertView == null) {
                 convertView = inflater.inflate(R.layout.item_app_picker, parent, false);
-
                 holder = new Holder();
                 holder.icon = convertView.findViewById(R.id.appPickerItemIcon);
                 holder.label = convertView.findViewById(R.id.appPickerItemLabel);
@@ -411,6 +371,7 @@ final class AppPickerDialog extends Dialog {
             synchronized (ICON_CACHE) {
                 cachedIcon = ICON_CACHE.get(item.packageName);
             }
+
             if (cachedIcon != null) {
                 holder.icon.setImageDrawable(cachedIcon);
             } else {
@@ -438,18 +399,12 @@ final class AppPickerDialog extends Dialog {
             }
 
             Drawable finalIcon = icon;
-
             mainHandler.post(() -> {
                 if (closed || !isShowing()) return;
+                if (!packageName.equals(target.getTag())) return;
 
-                Object currentTag = target.getTag();
-                if (!packageName.equals(currentTag)) return;
-
-                if (finalIcon != null) {
-                    target.setImageDrawable(finalIcon);
-                } else {
-                    target.setImageResource(android.R.drawable.sym_def_app_icon);
-                }
+                if (finalIcon != null) target.setImageDrawable(finalIcon);
+                else target.setImageResource(android.R.drawable.sym_def_app_icon);
             });
         });
     }
@@ -463,12 +418,10 @@ final class AppPickerDialog extends Dialog {
     private static final class AppEntry {
         final String label;
         final String packageName;
-        final int uid;
 
-        AppEntry(String label, String packageName, int uid) {
+        AppEntry(String label, String packageName) {
             this.label = label;
             this.packageName = packageName;
-            this.uid = uid;
         }
     }
 }

@@ -14,10 +14,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
-        android:paddingLeft="18dp"
-        android:paddingTop="14dp"
-        android:paddingRight="18dp"
-        android:paddingBottom="14dp">
+        android:padding="16dp">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -47,7 +44,7 @@
         <com.google.android.material.textfield.TextInputLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
+            android:layout_marginTop="6dp"
             android:hint="搜索应用名称或包名"
             app:boxBackgroundMode="outline"
             app:boxCornerRadiusBottomEnd="18dp"
@@ -70,7 +67,7 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
+            android:layout_marginTop="8dp"
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
@@ -102,7 +99,7 @@
         <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_marginTop="6dp"
+            android:layout_marginTop="4dp"
             android:layout_weight="1">
 
             <ListView
@@ -114,8 +111,7 @@
                 android:dividerHeight="2dp"
                 android:fastScrollEnabled="true"
                 android:paddingTop="4dp"
-                android:paddingBottom="4dp"
-                android:scrollbarStyle="outsideOverlay" />
+                android:paddingBottom="4dp" />
 
             <TextView
                 android:id="@+id/appPickerEmpty"
@@ -128,6 +124,5 @@
                 android:textSize="15sp"
                 android:visibility="gone" />
         </FrameLayout>
-
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>
