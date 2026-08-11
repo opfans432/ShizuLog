@@ -81,6 +81,7 @@ public class MainActivity extends AppCompatActivity {
     private TextView logEmptyMessage;
     private TextView logFilterSummary;
     private ScrollView logScroll;
+    private ScrollView mainScroll;
     private ImageView targetAppIcon;
     private Chip heroShizukuChip;
     private Chip recordingStateChip;
@@ -95,6 +96,8 @@ public class MainActivity extends AppCompatActivity {
     private MaterialButton stopButton;
     private MaterialButton exportButton;
     private MaterialButton snapshotButton;
+    private MaterialButton viewFullLogButton;
+    private MaterialButton historyLogButton;
     private AppPickerDialog appPickerDialog;
 
     private String selectedPackage = "";
@@ -185,6 +188,7 @@ public class MainActivity extends AppCompatActivity {
         logSizeText = findViewById(R.id.logSizeText);
         logText = findViewById(R.id.logText);
         logScroll = findViewById(R.id.logScroll);
+        mainScroll = findViewById(R.id.mainScroll);
         targetAppIcon = findViewById(R.id.targetAppIcon);
         heroShizukuChip = findViewById(R.id.heroShizukuChip);
         recordingStateChip = findViewById(R.id.recordingStateChip);
@@ -203,6 +207,8 @@ public class MainActivity extends AppCompatActivity {
         stopButton = findViewById(R.id.stopButton);
         exportButton = findViewById(R.id.exportButton);
         snapshotButton = findViewById(R.id.snapshotButton);
+        viewFullLogButton = findViewById(R.id.viewFullLogButton);
+        historyLogButton = findViewById(R.id.historyLogButton);
     }
 
     private void applySystemBarInsets() {
@@ -242,6 +248,19 @@ public class MainActivity extends AppCompatActivity {
             setStatus("已请求补抓崩溃快照");
         });
 
+        viewFullLogButton.setOnClickListener(
+                v -> openCurrentFullLog()
+        );
+
+        historyLogButton.setOnClickListener(
+                v -> startActivity(
+                        new Intent(
+                                this,
+                                LogHistoryActivity.class
+                        )
+                )
+        );
+
         findViewById(R.id.clearButton).setOnClickListener(v -> {
             screenBuffer.setLength(0);
             scheduleLogRender();
@@ -256,7 +275,7 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void onTextChanged(CharSequence s, int start, int before, int count) {
-                scheduleLogRender();
+                scheduleLogRenderPreservePage();
             }
 
             @Override public void afterTextChanged(Editable s) {}
@@ -264,17 +283,17 @@ public class MainActivity extends AppCompatActivity {
 
         logFilterAll.setOnClickListener(v -> {
             logFilterMode = FILTER_ALL;
-            scheduleLogRender();
+            scheduleLogRenderPreservePage();
         });
 
         logFilterWarn.setOnClickListener(v -> {
             logFilterMode = FILTER_WARN;
-            scheduleLogRender();
+            scheduleLogRenderPreservePage();
         });
 
         logFilterError.setOnClickListener(v -> {
             logFilterMode = FILTER_ERROR;
-            scheduleLogRender();
+            scheduleLogRenderPreservePage();
         });
     }
 
@@ -358,6 +377,8 @@ public class MainActivity extends AppCompatActivity {
         stopButton.setEnabled(recording);
         exportButton.setEnabled(hasLogFile);
         snapshotButton.setEnabled(hasTarget);
+        viewFullLogButton.setEnabled(hasLogFile);
+        historyLogButton.setEnabled(true);
 
         startButton.setText(recording ? "正在记录" : getString(R.string.start_recording));
 
@@ -658,6 +679,7 @@ public class MainActivity extends AppCompatActivity {
     private void appendLog(String line) {
         if (line == null) return;
 
+        boolean followTail = isLogNearBottom();
         screenBuffer.append(line).append('\n');
 
         if (screenBuffer.length() > MAX_SCREEN_CHARS) {
@@ -668,11 +690,58 @@ public class MainActivity extends AppCompatActivity {
 
         scheduleLogRender();
 
+        if (followTail) {
+            uiHandler.postDelayed(
+                    this::scrollLogToBottomWithoutFocus,
+                    110L
+            );
+        }
+
         appendedLineCounter++;
         if (appendedLineCounter >= 25) {
             appendedLineCounter = 0;
             updateLogMeta();
         }
+    }
+
+
+    private boolean isLogNearBottom() {
+        if (logScroll == null
+                || logText == null
+                || logScroll.getVisibility() != View.VISIBLE) {
+            return true;
+        }
+
+        int remaining =
+                logText.getHeight()
+                        - logScroll.getScrollY()
+                        - logScroll.getHeight();
+
+        return remaining <= dpToPx(72);
+    }
+
+    private void scrollLogToBottomWithoutFocus() {
+        if (logScroll == null
+                || logText == null
+                || logScroll.getVisibility() != View.VISIBLE) {
+            return;
+        }
+
+        int y = Math.max(
+                0,
+                logText.getHeight()
+                        - logScroll.getHeight()
+        );
+
+        logScroll.scrollTo(0, y);
+    }
+
+    private int dpToPx(int dp) {
+        return Math.round(
+                dp * getResources()
+                        .getDisplayMetrics()
+                        .density
+        );
     }
 
     private void scheduleLogRender() {
@@ -731,7 +800,6 @@ public class MainActivity extends AppCompatActivity {
 
         showLogConsole();
         logText.setText(filtered);
-        logScroll.post(() -> logScroll.fullScroll(View.FOCUS_DOWN));
     }
 
     private boolean matchesSeverity(String line) {
@@ -798,6 +866,75 @@ public class MainActivity extends AppCompatActivity {
         logEmptyState.setVisibility(View.VISIBLE);
         logEmptyTitle.setText(title);
         logEmptyMessage.setText(message);
+    }
+
+
+    private void scheduleLogRenderPreservePage() {
+        final int oldPageY =
+                mainScroll == null
+                        ? 0
+                        : mainScroll.getScrollY();
+
+        final int oldLogY =
+                logScroll == null
+                        ? 0
+                        : logScroll.getScrollY();
+
+        if (pendingLogRender != null) {
+            uiHandler.removeCallbacks(pendingLogRender);
+            pendingLogRender = null;
+        }
+
+        pendingLogRender = () -> {
+            pendingLogRender = null;
+            renderFilteredLog();
+
+            if (mainScroll != null) {
+                mainScroll.post(
+                        () -> mainScroll.scrollTo(
+                                0,
+                                oldPageY
+                        )
+                );
+            }
+
+            if (logScroll != null
+                    && logScroll.getVisibility()
+                            == View.VISIBLE) {
+                logScroll.post(
+                        () -> logScroll.scrollTo(
+                                0,
+                                oldLogY
+                        )
+                );
+            }
+        };
+
+        uiHandler.postDelayed(
+                pendingLogRender,
+                60L
+        );
+    }
+
+    private void openCurrentFullLog() {
+        if (currentLogPath == null
+                || !new File(currentLogPath).isFile()) {
+            toast("还没有可查看的完整日志");
+            return;
+        }
+
+        Intent intent =
+                new Intent(
+                        this,
+                        FullLogActivity.class
+                );
+
+        intent.putExtra(
+                FullLogActivity.EXTRA_FILE,
+                currentLogPath
+        );
+
+        startActivity(intent);
     }
 
     private void registerStatusReceiver() {
