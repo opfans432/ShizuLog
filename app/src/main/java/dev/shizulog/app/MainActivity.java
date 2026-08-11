@@ -12,6 +12,10 @@ import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.view.View;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -35,6 +39,8 @@ import java.io.FileInputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import rikka.shizuku.Shizuku;
 
@@ -51,7 +57,19 @@ public class MainActivity extends AppCompatActivity {
     private static final String KEY_RECORDING = "recording";
     private static final String KEY_TARGET_LAUNCHED = "target_launched";
 
+    private static final int FILTER_ALL = 0;
+    private static final int FILTER_WARN = 1;
+    private static final int FILTER_ERROR = 2;
+
+    private static final Pattern THREADTIME_PRIORITY = Pattern.compile(
+            "^\\s*\\d{2}-\\d{2}\\s+\\d{2}:\\d{2}:\\d{2}\\.\\d+\\s+\\d+\\s+\\d+\\s+([VDIWEF])\\s+"
+    );
+
+    private final Handler uiHandler = new Handler(Looper.getMainLooper());
+    private final StringBuilder screenBuffer = new StringBuilder();
+
     private TextInputEditText packageInput;
+    private TextInputEditText logSearchInput;
     private TextView selectedLabel;
     private TextView permissionState;
     private TextView backendText;
@@ -61,12 +79,22 @@ public class MainActivity extends AppCompatActivity {
     private TextView logText;
     private TextView logEmptyTitle;
     private TextView logEmptyMessage;
+    private TextView logFilterSummary;
     private ScrollView logScroll;
     private ImageView targetAppIcon;
     private Chip heroShizukuChip;
+    private Chip recordingStateChip;
+    private Chip logFilterAll;
+    private Chip logFilterWarn;
+    private Chip logFilterError;
     private LinearLayout manualPackageContainer;
     private LinearLayout logEmptyState;
     private MaterialButton manualPackageToggle;
+    private MaterialButton startButton;
+    private MaterialButton openTargetButton;
+    private MaterialButton stopButton;
+    private MaterialButton exportButton;
+    private MaterialButton snapshotButton;
     private AppPickerDialog appPickerDialog;
 
     private String selectedPackage = "";
@@ -74,8 +102,9 @@ public class MainActivity extends AppCompatActivity {
     private String currentLogPath;
     private boolean pendingStartAfterPermission;
     private boolean manualPackageExpanded;
+    private int logFilterMode = FILTER_ALL;
     private int appendedLineCounter;
-    private final StringBuilder screenBuffer = new StringBuilder();
+    private Runnable pendingLogRender;
 
     private final Shizuku.OnBinderReceivedListener binderReceivedListener = this::refreshShizukuState;
     private final Shizuku.OnBinderDeadListener binderDeadListener = this::refreshShizukuState;
@@ -118,6 +147,8 @@ public class MainActivity extends AppCompatActivity {
                     prefs().edit().putString(KEY_CURRENT_LOG_PATH, path).apply();
                     updateLogMeta();
                 }
+
+                refreshActionState();
             }
         }
     };
@@ -139,11 +170,13 @@ public class MainActivity extends AppCompatActivity {
         Shizuku.addRequestPermissionResultListener(permissionResultListener);
 
         refreshShizukuState();
+        refreshActionState();
         requestNotificationPermissionIfNeeded();
     }
 
     private void bindViews() {
         packageInput = findViewById(R.id.packageInput);
+        logSearchInput = findViewById(R.id.logSearchInput);
         selectedLabel = findViewById(R.id.selectedLabel);
         permissionState = findViewById(R.id.permissionState);
         backendText = findViewById(R.id.backendText);
@@ -154,11 +187,22 @@ public class MainActivity extends AppCompatActivity {
         logScroll = findViewById(R.id.logScroll);
         targetAppIcon = findViewById(R.id.targetAppIcon);
         heroShizukuChip = findViewById(R.id.heroShizukuChip);
+        recordingStateChip = findViewById(R.id.recordingStateChip);
+        logFilterAll = findViewById(R.id.logFilterAll);
+        logFilterWarn = findViewById(R.id.logFilterWarn);
+        logFilterError = findViewById(R.id.logFilterError);
+        logFilterSummary = findViewById(R.id.logFilterSummary);
         manualPackageContainer = findViewById(R.id.manualPackageContainer);
         manualPackageToggle = findViewById(R.id.manualPackageToggle);
         logEmptyState = findViewById(R.id.logEmptyState);
         logEmptyTitle = findViewById(R.id.logEmptyTitle);
         logEmptyMessage = findViewById(R.id.logEmptyMessage);
+
+        startButton = findViewById(R.id.startButton);
+        openTargetButton = findViewById(R.id.openTargetButton);
+        stopButton = findViewById(R.id.stopButton);
+        exportButton = findViewById(R.id.exportButton);
+        snapshotButton = findViewById(R.id.snapshotButton);
     }
 
     private void applySystemBarInsets() {
@@ -186,25 +230,51 @@ public class MainActivity extends AppCompatActivity {
 
         findViewById(R.id.chooseTargetButton).setOnClickListener(v -> showAppPicker());
         findViewById(R.id.usePackageButton).setOnClickListener(v -> selectTypedPackage());
-
         manualPackageToggle.setOnClickListener(v -> toggleManualPackageInput());
 
-        findViewById(R.id.startButton).setOnClickListener(v -> startCapture());
-        findViewById(R.id.openTargetButton).setOnClickListener(v -> launchTarget());
-        findViewById(R.id.stopButton).setOnClickListener(v -> stopCapture());
+        startButton.setOnClickListener(v -> startCapture());
+        openTargetButton.setOnClickListener(v -> launchTarget());
+        stopButton.setOnClickListener(v -> stopCapture());
 
-        findViewById(R.id.exportButton).setOnClickListener(v -> exportLog());
-        findViewById(R.id.snapshotButton).setOnClickListener(v -> {
+        exportButton.setOnClickListener(v -> exportLog());
+        snapshotButton.setOnClickListener(v -> {
             requestCrashSnapshot();
             setStatus("已请求补抓崩溃快照");
         });
 
         findViewById(R.id.clearButton).setOnClickListener(v -> {
             screenBuffer.setLength(0);
+            scheduleLogRender();
             showEmptyLogState(
                     "预览已清空",
                     "日志文件不会被删除；新日志到来后会继续显示"
             );
+        });
+
+        logSearchInput.addTextChangedListener(new TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                scheduleLogRender();
+            }
+
+            @Override public void afterTextChanged(Editable s) {}
+        });
+
+        logFilterAll.setOnClickListener(v -> {
+            logFilterMode = FILTER_ALL;
+            scheduleLogRender();
+        });
+
+        logFilterWarn.setOnClickListener(v -> {
+            logFilterMode = FILTER_WARN;
+            scheduleLogRender();
+        });
+
+        logFilterError.setOnClickListener(v -> {
+            logFilterMode = FILTER_ERROR;
+            scheduleLogRender();
         });
     }
 
@@ -217,9 +287,7 @@ public class MainActivity extends AppCompatActivity {
                 manualPackageExpanded ? "▾ 收起手动包名" : "▸ 手动输入包名"
         );
 
-        if (manualPackageExpanded) {
-            packageInput.requestFocus();
-        }
+        if (manualPackageExpanded) packageInput.requestFocus();
     }
 
     private void refreshShizukuState() {
@@ -245,6 +313,8 @@ public class MainActivity extends AppCompatActivity {
             } catch (Throwable e) {
                 updateShizukuUi("状态读取失败", "—", false, true);
             }
+
+            refreshActionState();
         });
     }
 
@@ -276,6 +346,38 @@ public class MainActivity extends AppCompatActivity {
         heroShizukuChip.setChipBackgroundColor(
                 android.content.res.ColorStateList.valueOf(chipBg)
         );
+    }
+
+    private void refreshActionState() {
+        boolean hasTarget = selectedPackage != null && !selectedPackage.isEmpty();
+        boolean recording = prefs().getBoolean(KEY_RECORDING, false);
+        boolean hasLogFile = currentLogPath != null && new File(currentLogPath).isFile();
+
+        startButton.setEnabled(hasTarget && !recording);
+        openTargetButton.setEnabled(hasTarget);
+        stopButton.setEnabled(recording);
+        exportButton.setEnabled(hasLogFile);
+        snapshotButton.setEnabled(hasTarget);
+
+        startButton.setText(recording ? "正在记录" : getString(R.string.start_recording));
+
+        if (recording) {
+            recordingStateChip.setText("● 正在记录");
+            recordingStateChip.setTextColor(getColor(R.color.status_success));
+            recordingStateChip.setChipBackgroundColor(
+                    android.content.res.ColorStateList.valueOf(
+                            getColor(R.color.status_success_container)
+                    )
+            );
+        } else {
+            recordingStateChip.setText("已停止");
+            recordingStateChip.setTextColor(getColor(R.color.md_theme_onSurfaceVariant));
+            recordingStateChip.setChipBackgroundColor(
+                    android.content.res.ColorStateList.valueOf(
+                            getColor(R.color.md_theme_surfaceContainer)
+                    )
+            );
+        }
     }
 
     private boolean requestShizukuPermission(boolean startAfterGrant) {
@@ -343,9 +445,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void showAppPicker() {
-        if (appPickerDialog != null || isFinishing() || isDestroyed()) {
-            return;
-        }
+        if (appPickerDialog != null || isFinishing() || isDestroyed()) return;
 
         try {
             appPickerDialog = new AppPickerDialog(
@@ -397,6 +497,8 @@ public class MainActivity extends AppCompatActivity {
                 .putString(KEY_TARGET_PACKAGE, pkg)
                 .putString(KEY_TARGET_LABEL, label)
                 .apply();
+
+        refreshActionState();
     }
 
     private void startCapture() {
@@ -433,6 +535,9 @@ public class MainActivity extends AppCompatActivity {
             ApplicationInfo ai = getPackageManager()
                     .getApplicationInfo(selectedPackage, 0);
 
+            prefs().edit().putBoolean(KEY_RECORDING, true).apply();
+            refreshActionState();
+
             Intent service = new Intent(this, LogCaptureService.class)
                     .setAction(LogCaptureService.ACTION_START)
                     .putExtra(LogCaptureService.EXTRA_PACKAGE, selectedPackage)
@@ -442,13 +547,18 @@ public class MainActivity extends AppCompatActivity {
             startForegroundService(service);
 
             screenBuffer.setLength(0);
-            showLogConsoleText("正在启动日志采集…\n");
+            showEmptyLogState(
+                    "等待日志",
+                    "记录已经开始，正在等待目标应用输出日志"
+            );
             setStatus(
                     "已启动日志采集，目标 UID="
                             + ai.uid
                             + "。现在可以打开目标应用复现问题。"
             );
         } catch (Exception e) {
+            prefs().edit().putBoolean(KEY_RECORDING, false).apply();
+            refreshActionState();
             toast("启动记录失败：" + safeMessage(e));
         }
     }
@@ -463,8 +573,7 @@ public class MainActivity extends AppCompatActivity {
                         getPackageManager().getApplicationLabel(ai)
                 );
                 applyTarget(label, typed);
-            } catch (Exception ignored) {
-            }
+            } catch (Exception ignored) {}
         }
     }
 
@@ -490,6 +599,9 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void stopCapture() {
+        prefs().edit().putBoolean(KEY_RECORDING, false).apply();
+        refreshActionState();
+
         Intent service = new Intent(this, LogCaptureService.class)
                 .setAction(LogCaptureService.ACTION_STOP);
         startService(service);
@@ -528,13 +640,10 @@ public class MainActivity extends AppCompatActivity {
         try (FileInputStream in = new FileInputStream(currentLogPath);
              OutputStream out = getContentResolver().openOutputStream(uri, "w")) {
 
-            if (out == null) {
-                throw new IllegalStateException("无法打开导出位置");
-            }
+            if (out == null) throw new IllegalStateException("无法打开导出位置");
 
             byte[] buffer = new byte[32 * 1024];
             int count;
-
             while ((count = in.read(buffer)) > 0) {
                 out.write(buffer, 0, count);
             }
@@ -557,9 +666,7 @@ public class MainActivity extends AppCompatActivity {
             screenBuffer.delete(0, newline >= 0 ? newline + 1 : cut);
         }
 
-        showLogConsole();
-        logText.setText(screenBuffer);
-        logScroll.post(() -> logScroll.fullScroll(View.FOCUS_DOWN));
+        scheduleLogRender();
 
         appendedLineCounter++;
         if (appendedLineCounter >= 25) {
@@ -568,14 +675,122 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    private void scheduleLogRender() {
+        if (pendingLogRender != null) return;
+
+        pendingLogRender = () -> {
+            pendingLogRender = null;
+            renderFilteredLog();
+        };
+
+        uiHandler.postDelayed(pendingLogRender, 80L);
+    }
+
+    private void renderFilteredLog() {
+        String raw = screenBuffer.toString();
+
+        if (raw.isEmpty()) {
+            showEmptyLogState(
+                    "暂无日志",
+                    "开始记录后，目标应用的日志会显示在这里"
+            );
+            updateFilterSummary(0, 0);
+            return;
+        }
+
+        String query = textOf(logSearchInput).trim().toLowerCase(Locale.ROOT);
+        String[] lines = raw.split("\n", -1);
+        StringBuilder filtered = new StringBuilder();
+        int matched = 0;
+        int total = 0;
+
+        for (String line : lines) {
+            if (line.isEmpty()) continue;
+            total++;
+
+            if (!matchesSeverity(line)) continue;
+
+            if (!query.isEmpty()
+                    && !line.toLowerCase(Locale.ROOT).contains(query)) {
+                continue;
+            }
+
+            filtered.append(line).append('\n');
+            matched++;
+        }
+
+        updateFilterSummary(matched, total);
+
+        if (filtered.length() == 0) {
+            showEmptyLogState(
+                    "没有匹配日志",
+                    "调整搜索关键词或日志级别筛选"
+            );
+            return;
+        }
+
+        showLogConsole();
+        logText.setText(filtered);
+        logScroll.post(() -> logScroll.fullScroll(View.FOCUS_DOWN));
+    }
+
+    private boolean matchesSeverity(String line) {
+        if (logFilterMode == FILTER_ALL) return true;
+
+        String priority = readPriority(line);
+        boolean errorKeyword = containsErrorKeyword(line);
+
+        if (logFilterMode == FILTER_ERROR) {
+            return "E".equals(priority)
+                    || "F".equals(priority)
+                    || errorKeyword;
+        }
+
+        return "W".equals(priority)
+                || "E".equals(priority)
+                || "F".equals(priority)
+                || errorKeyword;
+    }
+
+    private static String readPriority(String line) {
+        Matcher matcher = THREADTIME_PRIORITY.matcher(line);
+        return matcher.find() ? matcher.group(1) : "";
+    }
+
+    private static boolean containsErrorKeyword(String line) {
+        String lower = line.toLowerCase(Locale.ROOT);
+        return lower.contains("fatal exception")
+                || lower.contains("caused by:")
+                || lower.contains("androidruntime")
+                || lower.contains("exception:")
+                || lower.contains(" error")
+                || lower.contains("native crash")
+                || lower.contains("signal ");
+    }
+
+    private void updateFilterSummary(int matched, int total) {
+        String mode;
+        if (logFilterMode == FILTER_ERROR) mode = "ERROR";
+        else if (logFilterMode == FILTER_WARN) mode = "WARN+";
+        else mode = "全部";
+
+        String query = textOf(logSearchInput).trim();
+
+        if (total == 0) {
+            logFilterSummary.setText("暂无可筛选日志");
+        } else if (query.isEmpty() && logFilterMode == FILTER_ALL) {
+            logFilterSummary.setText("显示全部 " + total + " 行");
+        } else {
+            String suffix = query.isEmpty() ? "" : " · 搜索“" + query + "”";
+            logFilterSummary.setText(
+                    mode + " · 匹配 " + matched + " / " + total + " 行" + suffix
+            );
+        }
+    }
+
     private void showLogConsole() {
         logEmptyState.setVisibility(View.GONE);
         logScroll.setVisibility(View.VISIBLE);
-    }
-
-    private void showLogConsoleText(String text) {
-        showLogConsole();
-        logText.setText(text);
     }
 
     private void showEmptyLogState(String title, String message) {
@@ -621,7 +836,6 @@ public class MainActivity extends AppCompatActivity {
             preferences.edit()
                     .putBoolean(KEY_TARGET_LAUNCHED, false)
                     .apply();
-
             requestCrashSnapshot();
         }
     }
@@ -701,6 +915,7 @@ public class MainActivity extends AppCompatActivity {
         }
 
         updateLogMeta();
+        refreshActionState();
     }
 
     private void loadLogTail(String path) {
@@ -741,21 +956,8 @@ public class MainActivity extends AppCompatActivity {
 
             screenBuffer.setLength(0);
             screenBuffer.append(text);
-
-            if (text.isEmpty()) {
-                showEmptyLogState(
-                        "暂无日志",
-                        "当前日志文件还没有内容"
-                );
-            } else {
-                showLogConsole();
-                logText.setText(text);
-                logScroll.post(
-                        () -> logScroll.fullScroll(View.FOCUS_DOWN)
-                );
-            }
-        } catch (Exception ignored) {
-        }
+            renderFilteredLog();
+        } catch (Exception ignored) {}
     }
 
     private void requestCrashSnapshot() {
@@ -764,8 +966,7 @@ public class MainActivity extends AppCompatActivity {
 
         try {
             startService(service);
-        } catch (Exception ignored) {
-        }
+        } catch (Exception ignored) {}
     }
 
     private void setStatus(String text) {
@@ -776,6 +977,7 @@ public class MainActivity extends AppCompatActivity {
         if (currentLogPath == null || currentLogPath.isEmpty()) {
             logPathText.setText("日志路径：—");
             logSizeText.setText("日志大小：0 B");
+            refreshActionState();
             return;
         }
 
@@ -784,15 +986,14 @@ public class MainActivity extends AppCompatActivity {
         logSizeText.setText(
                 "日志大小：" + humanSize(file.isFile() ? file.length() : 0)
         );
+        refreshActionState();
     }
 
     private static String humanSize(long bytes) {
         if (bytes < 1024) return bytes + " B";
 
         double kb = bytes / 1024.0;
-        if (kb < 1024) {
-            return String.format(Locale.US, "%.1f KB", kb);
-        }
+        if (kb < 1024) return String.format(Locale.US, "%.1f KB", kb);
 
         return String.format(Locale.US, "%.2f MB", kb / 1024.0);
     }
@@ -805,18 +1006,21 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onDestroy() {
+        if (pendingLogRender != null) {
+            uiHandler.removeCallbacks(pendingLogRender);
+            pendingLogRender = null;
+        }
+
         if (appPickerDialog != null) {
             try {
                 appPickerDialog.dismiss();
-            } catch (Throwable ignored) {
-            }
+            } catch (Throwable ignored) {}
             appPickerDialog = null;
         }
 
         try {
             unregisterReceiver(receiver);
-        } catch (Exception ignored) {
-        }
+        } catch (Exception ignored) {}
 
         Shizuku.removeBinderReceivedListener(binderReceivedListener);
         Shizuku.removeBinderDeadListener(binderDeadListener);

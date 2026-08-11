@@ -40,33 +40,33 @@ jobs:
         shell: bash
         run: |
           mkdir -p dist
-          cp app/build/outputs/apk/debug/app-debug.apk dist/ShizuLog-v1.1.2.apk
-          sha256sum dist/ShizuLog-v1.1.2.apk | tee dist/ShizuLog-v1.1.2.apk.sha256
+          cp app/build/outputs/apk/debug/app-debug.apk dist/ShizuLog-v1.2.0.apk
+          sha256sum dist/ShizuLog-v1.2.0.apk | tee dist/ShizuLog-v1.2.0.apk.sha256
 
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ShizuLog-v1.1.2
+          name: ShizuLog-v1.2.0
           path: |
-            dist/ShizuLog-v1.1.2.apk
-            dist/ShizuLog-v1.1.2.apk.sha256
+            dist/ShizuLog-v1.2.0.apk
+            dist/ShizuLog-v1.2.0.apk.sha256
 
-      - name: Publish v1.1.2
+      - name: Publish v1.2.0
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: v1.1.2
+          TAG: v1.2.0
         shell: bash
         run: |
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" \
-              dist/ShizuLog-v1.1.2.apk \
-              dist/ShizuLog-v1.1.2.apk.sha256 \
+              dist/ShizuLog-v1.2.0.apk \
+              dist/ShizuLog-v1.2.0.apk.sha256 \
               --clobber
           else
             gh release create "$TAG" \
-              dist/ShizuLog-v1.1.2.apk \
-              dist/ShizuLog-v1.1.2.apk.sha256 \
+              dist/ShizuLog-v1.2.0.apk \
+              dist/ShizuLog-v1.2.0.apk.sha256 \
               --target "$GITHUB_SHA" \
-              --title "ShizuLog v1.1.2" \
+              --title "ShizuLog v1.2.0" \
               --notes-file RELEASE_NOTES.md
           fi
