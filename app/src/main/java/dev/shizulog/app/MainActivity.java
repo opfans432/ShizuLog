@@ -38,7 +38,11 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -56,6 +60,12 @@ public class MainActivity extends AppCompatActivity {
     private static final String KEY_LAST_STATUS = "last_status";
     private static final String KEY_RECORDING = "recording";
     private static final String KEY_TARGET_LAUNCHED = "target_launched";
+    private static final String KEY_CAPTURE_MODE = "capture_mode";
+    private static final String KEY_MULTI_PACKAGES = "multi_packages";
+
+    private static final int CAPTURE_SINGLE = LogCaptureService.MODE_SINGLE;
+    private static final int CAPTURE_MULTI = LogCaptureService.MODE_MULTI;
+    private static final int CAPTURE_GLOBAL = LogCaptureService.MODE_GLOBAL;
 
     private static final int FILTER_ALL = 0;
     private static final int FILTER_WARN = 1;
@@ -88,8 +98,14 @@ public class MainActivity extends AppCompatActivity {
     private Chip logFilterAll;
     private Chip logFilterWarn;
     private Chip logFilterError;
+    private Chip captureModeSingle;
+    private Chip captureModeMulti;
+    private Chip captureModeGlobal;
     private LinearLayout manualPackageContainer;
     private LinearLayout logEmptyState;
+    private LinearLayout singleTargetContainer;
+    private LinearLayout multiTargetContainer;
+    private LinearLayout globalTargetContainer;
     private MaterialButton manualPackageToggle;
     private MaterialButton startButton;
     private MaterialButton openTargetButton;
@@ -98,11 +114,18 @@ public class MainActivity extends AppCompatActivity {
     private MaterialButton snapshotButton;
     private MaterialButton viewFullLogButton;
     private MaterialButton historyLogButton;
+    private MaterialButton chooseTargetButton;
+    private MaterialButton chooseMultiTargetButton;
+    private TextView multiSelectedSummary;
     private AppPickerDialog appPickerDialog;
+    private MultiAppPickerDialog multiAppPickerDialog;
 
     private String selectedPackage = "";
     private String selectedAppLabel = "";
     private String currentLogPath;
+    private int captureMode = CAPTURE_SINGLE;
+    private final LinkedHashSet<String> selectedMultiPackages =
+            new LinkedHashSet<>();
     private boolean pendingStartAfterPermission;
     private boolean manualPackageExpanded;
     private int logFilterMode = FILTER_ALL;
@@ -195,12 +218,19 @@ public class MainActivity extends AppCompatActivity {
         logFilterAll = findViewById(R.id.logFilterAll);
         logFilterWarn = findViewById(R.id.logFilterWarn);
         logFilterError = findViewById(R.id.logFilterError);
+        captureModeSingle = findViewById(R.id.captureModeSingle);
+        captureModeMulti = findViewById(R.id.captureModeMulti);
+        captureModeGlobal = findViewById(R.id.captureModeGlobal);
         logFilterSummary = findViewById(R.id.logFilterSummary);
         manualPackageContainer = findViewById(R.id.manualPackageContainer);
         manualPackageToggle = findViewById(R.id.manualPackageToggle);
         logEmptyState = findViewById(R.id.logEmptyState);
         logEmptyTitle = findViewById(R.id.logEmptyTitle);
         logEmptyMessage = findViewById(R.id.logEmptyMessage);
+        singleTargetContainer = findViewById(R.id.singleTargetContainer);
+        multiTargetContainer = findViewById(R.id.multiTargetContainer);
+        globalTargetContainer = findViewById(R.id.globalTargetContainer);
+        multiSelectedSummary = findViewById(R.id.multiSelectedSummary);
 
         startButton = findViewById(R.id.startButton);
         openTargetButton = findViewById(R.id.openTargetButton);
@@ -209,6 +239,8 @@ public class MainActivity extends AppCompatActivity {
         snapshotButton = findViewById(R.id.snapshotButton);
         viewFullLogButton = findViewById(R.id.viewFullLogButton);
         historyLogButton = findViewById(R.id.historyLogButton);
+        chooseTargetButton = findViewById(R.id.chooseTargetButton);
+        chooseMultiTargetButton = findViewById(R.id.chooseMultiTargetButton);
     }
 
     private void applySystemBarInsets() {
@@ -234,7 +266,8 @@ public class MainActivity extends AppCompatActivity {
         findViewById(R.id.openShizukuButton).setOnClickListener(v -> openShizukuManager());
         findViewById(R.id.refreshButton).setOnClickListener(v -> refreshShizukuState());
 
-        findViewById(R.id.chooseTargetButton).setOnClickListener(v -> showAppPicker());
+        chooseTargetButton.setOnClickListener(v -> showAppPicker());
+        chooseMultiTargetButton.setOnClickListener(v -> showMultiAppPicker());
         findViewById(R.id.usePackageButton).setOnClickListener(v -> selectTypedPackage());
         manualPackageToggle.setOnClickListener(v -> toggleManualPackageInput());
 
@@ -295,6 +328,222 @@ public class MainActivity extends AppCompatActivity {
             logFilterMode = FILTER_ERROR;
             scheduleLogRenderPreservePage();
         });
+
+
+        captureModeSingle.setOnClickListener(
+                v -> setCaptureMode(CAPTURE_SINGLE, true)
+        );
+
+        captureModeMulti.setOnClickListener(
+                v -> setCaptureMode(CAPTURE_MULTI, true)
+        );
+
+        captureModeGlobal.setOnClickListener(
+                v -> setCaptureMode(CAPTURE_GLOBAL, true)
+        );
+    }
+
+
+    private void setCaptureMode(
+            int mode,
+            boolean persist
+    ) {
+        captureMode = mode;
+
+        singleTargetContainer.setVisibility(
+                mode == CAPTURE_SINGLE
+                        ? View.VISIBLE
+                        : View.GONE
+        );
+
+        multiTargetContainer.setVisibility(
+                mode == CAPTURE_MULTI
+                        ? View.VISIBLE
+                        : View.GONE
+        );
+
+        globalTargetContainer.setVisibility(
+                mode == CAPTURE_GLOBAL
+                        ? View.VISIBLE
+                        : View.GONE
+        );
+
+        captureModeSingle.setChecked(
+                mode == CAPTURE_SINGLE
+        );
+
+        captureModeMulti.setChecked(
+                mode == CAPTURE_MULTI
+        );
+
+        captureModeGlobal.setChecked(
+                mode == CAPTURE_GLOBAL
+        );
+
+        if (persist) {
+            prefs().edit()
+                    .putInt(
+                            KEY_CAPTURE_MODE,
+                            mode
+                    )
+                    .apply();
+        }
+
+        updateMultiSummary();
+        refreshActionState();
+    }
+
+    private void showMultiAppPicker() {
+        if (multiAppPickerDialog != null
+                || isFinishing()
+                || isDestroyed()) {
+            return;
+        }
+
+        try {
+            multiAppPickerDialog =
+                    new MultiAppPickerDialog(
+                            this,
+                            selectedMultiPackages,
+                            this::applyMultiSelection
+                    );
+
+            multiAppPickerDialog
+                    .setOnDismissListener(
+                            dialog ->
+                                    multiAppPickerDialog =
+                                            null
+                    );
+
+            multiAppPickerDialog.show();
+        } catch (Throwable error) {
+            multiAppPickerDialog = null;
+            toast(
+                    "打开多应用选择器失败："
+                            + safeMessage(error)
+            );
+        }
+    }
+
+    private void applyMultiSelection(
+            List<String> packages
+    ) {
+        selectedMultiPackages.clear();
+        selectedMultiPackages.addAll(packages);
+
+        prefs().edit()
+                .putString(
+                        KEY_MULTI_PACKAGES,
+                        joinPackages(
+                                selectedMultiPackages
+                        )
+                )
+                .apply();
+
+        updateMultiSummary();
+        refreshActionState();
+    }
+
+    private void updateMultiSummary() {
+        if (selectedMultiPackages.isEmpty()) {
+            multiSelectedSummary.setText(
+                    "尚未选择应用"
+            );
+            return;
+        }
+
+        StringBuilder text =
+                new StringBuilder();
+
+        int shown = 0;
+
+        for (String pkg :
+                selectedMultiPackages) {
+
+            if (shown >= 4) {
+                break;
+            }
+
+            if (shown > 0) {
+                text.append("、");
+            }
+
+            text.append(
+                    getAppLabelOrPackage(pkg)
+            );
+
+            shown++;
+        }
+
+        if (selectedMultiPackages.size()
+                > shown) {
+            text.append(" 等");
+        }
+
+        multiSelectedSummary.setText(
+                "已选择 "
+                        + selectedMultiPackages.size()
+                        + " 个应用\n"
+                        + text
+        );
+    }
+
+    private String getAppLabelOrPackage(
+            String pkg
+    ) {
+        try {
+            ApplicationInfo ai =
+                    getPackageManager()
+                            .getApplicationInfo(
+                                    pkg,
+                                    0
+                            );
+
+            return String.valueOf(
+                    getPackageManager()
+                            .getApplicationLabel(ai)
+            );
+        } catch (Exception ignored) {
+            return pkg;
+        }
+    }
+
+    private static String joinPackages(
+            Set<String> packages
+    ) {
+        StringBuilder out =
+                new StringBuilder();
+
+        for (String pkg : packages) {
+            if (out.length() > 0) {
+                out.append('\n');
+            }
+            out.append(pkg);
+        }
+
+        return out.toString();
+    }
+
+    private void restoreMultiPackages(
+            String stored
+    ) {
+        selectedMultiPackages.clear();
+
+        if (stored == null
+                || stored.isEmpty()) {
+            return;
+        }
+
+        String[] packages =
+                stored.split("\\n");
+
+        for (String pkg : packages) {
+            if (!pkg.trim().isEmpty()) {
+                selectedMultiPackages.add(
+                        pkg.trim()
+                );
+            }
+        }
     }
 
     private void toggleManualPackageInput() {
@@ -368,36 +617,141 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void refreshActionState() {
-        boolean hasTarget = selectedPackage != null && !selectedPackage.isEmpty();
-        boolean recording = prefs().getBoolean(KEY_RECORDING, false);
-        boolean hasLogFile = currentLogPath != null && new File(currentLogPath).isFile();
+        boolean hasSingleTarget =
+                selectedPackage != null
+                        && !selectedPackage.isEmpty();
 
-        startButton.setEnabled(hasTarget && !recording);
-        openTargetButton.setEnabled(hasTarget);
+        boolean hasMultiTargets =
+                !selectedMultiPackages.isEmpty();
+
+        boolean hasRequiredTarget =
+                captureMode == CAPTURE_GLOBAL
+                        || (captureMode
+                                    == CAPTURE_SINGLE
+                                && hasSingleTarget)
+                        || (captureMode
+                                    == CAPTURE_MULTI
+                                && hasMultiTargets);
+
+        boolean recording =
+                prefs().getBoolean(
+                        KEY_RECORDING,
+                        false
+                );
+
+        boolean hasLogFile =
+                currentLogPath != null
+                        && new File(
+                                currentLogPath
+                        ).isFile();
+
+        startButton.setEnabled(
+                hasRequiredTarget
+                        && !recording
+        );
+
+        openTargetButton.setEnabled(
+                captureMode == CAPTURE_SINGLE
+                        && hasSingleTarget
+                        && !recording
+        );
+
         stopButton.setEnabled(recording);
         exportButton.setEnabled(hasLogFile);
-        snapshotButton.setEnabled(hasTarget);
-        viewFullLogButton.setEnabled(hasLogFile);
+
+        snapshotButton.setEnabled(
+                captureMode == CAPTURE_GLOBAL
+                        || (captureMode
+                                    == CAPTURE_SINGLE
+                                && hasSingleTarget)
+                        || (captureMode
+                                    == CAPTURE_MULTI
+                                && hasMultiTargets)
+        );
+
+        viewFullLogButton.setEnabled(
+                hasLogFile
+        );
+
         historyLogButton.setEnabled(true);
 
-        startButton.setText(recording ? "正在记录" : getString(R.string.start_recording));
+        chooseTargetButton.setEnabled(
+                !recording
+        );
+
+        chooseMultiTargetButton.setEnabled(
+                !recording
+        );
+
+        manualPackageToggle.setEnabled(
+                !recording
+        );
+
+        captureModeSingle.setEnabled(
+                !recording
+        );
+
+        captureModeMulti.setEnabled(
+                !recording
+        );
+
+        captureModeGlobal.setEnabled(
+                !recording
+        );
+
+        startButton.setText(
+                recording
+                        ? "正在记录"
+                        : getString(
+                                R.string.start_recording
+                        )
+        );
 
         if (recording) {
-            recordingStateChip.setText("● 正在记录");
-            recordingStateChip.setTextColor(getColor(R.color.status_success));
-            recordingStateChip.setChipBackgroundColor(
-                    android.content.res.ColorStateList.valueOf(
-                            getColor(R.color.status_success_container)
+            recordingStateChip.setText(
+                    "● 正在记录"
+            );
+
+            recordingStateChip.setTextColor(
+                    getColor(
+                            R.color.status_success
                     )
             );
+
+            recordingStateChip
+                    .setChipBackgroundColor(
+                            android.content.res
+                                    .ColorStateList
+                                    .valueOf(
+                                            getColor(
+                                                    R.color
+                                                            .status_success_container
+                                            )
+                                    )
+                    );
         } else {
-            recordingStateChip.setText("已停止");
-            recordingStateChip.setTextColor(getColor(R.color.md_theme_onSurfaceVariant));
-            recordingStateChip.setChipBackgroundColor(
-                    android.content.res.ColorStateList.valueOf(
-                            getColor(R.color.md_theme_surfaceContainer)
+            recordingStateChip.setText(
+                    "已停止"
+            );
+
+            recordingStateChip.setTextColor(
+                    getColor(
+                            R.color
+                                    .md_theme_onSurfaceVariant
                     )
             );
+
+            recordingStateChip
+                    .setChipBackgroundColor(
+                            android.content.res
+                                    .ColorStateList
+                                    .valueOf(
+                                            getColor(
+                                                    R.color
+                                                            .md_theme_surfaceContainer
+                                            )
+                                    )
+                    );
         }
     }
 
@@ -523,13 +877,43 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void startCapture() {
-        selectTypedPackageSilently();
+        if (captureMode == CAPTURE_SINGLE) {
+            selectTypedPackageSilently();
 
-        if (selectedPackage.isEmpty()) {
-            toast("先选择目标应用");
+            if (selectedPackage.isEmpty()) {
+                toast("先选择目标应用");
+                return;
+            }
+        } else if (captureMode == CAPTURE_MULTI) {
+            if (selectedMultiPackages.isEmpty()) {
+                toast("先选择至少一个应用");
+                return;
+            }
+        }
+
+        if (captureMode == CAPTURE_GLOBAL) {
+            new MaterialAlertDialogBuilder(this)
+                    .setTitle("开始全局 Logcat？")
+                    .setMessage(
+                            "全局模式不会按应用 UID 过滤，会记录 Shizuku 当前权限可读取的 main / system / crash 日志。日志量可能快速增长，并可能包含其他应用、账号、路径、网络请求等敏感信息。"
+                    )
+                    .setPositiveButton(
+                            "开始全局记录",
+                            (dialog, which) ->
+                                    continueStartCapture()
+                    )
+                    .setNegativeButton(
+                            "取消",
+                            null
+                    )
+                    .show();
             return;
         }
 
+        continueStartCapture();
+    }
+
+    private void continueStartCapture() {
         if (!isShizukuReady()) {
             requestShizukuPermission(true);
             return;
@@ -549,38 +933,201 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void startCaptureInternal() {
-        selectTypedPackageSilently();
-        if (selectedPackage.isEmpty()) return;
-
         try {
-            ApplicationInfo ai = getPackageManager()
-                    .getApplicationInfo(selectedPackage, 0);
+            ArrayList<String> packages =
+                    new ArrayList<>();
 
-            prefs().edit().putBoolean(KEY_RECORDING, true).apply();
+            ArrayList<String> labels =
+                    new ArrayList<>();
+
+            ArrayList<Integer> uids =
+                    new ArrayList<>();
+
+            String status;
+
+            if (captureMode == CAPTURE_SINGLE) {
+                selectTypedPackageSilently();
+
+                if (selectedPackage.isEmpty()) {
+                    return;
+                }
+
+                ApplicationInfo ai =
+                        getPackageManager()
+                                .getApplicationInfo(
+                                        selectedPackage,
+                                        0
+                                );
+
+                packages.add(
+                        selectedPackage
+                );
+
+                labels.add(
+                        selectedAppLabel == null
+                                        || selectedAppLabel
+                                                .isEmpty()
+                                ? getAppLabelOrPackage(
+                                        selectedPackage
+                                )
+                                : selectedAppLabel
+                );
+
+                uids.add(ai.uid);
+
+                status =
+                        "已启动单应用日志采集，UID="
+                                + ai.uid;
+            } else if (captureMode
+                    == CAPTURE_MULTI) {
+
+                for (String pkg :
+                        selectedMultiPackages) {
+                    try {
+                        ApplicationInfo ai =
+                                getPackageManager()
+                                        .getApplicationInfo(
+                                                pkg,
+                                                0
+                                        );
+
+                        packages.add(pkg);
+                        labels.add(
+                                getAppLabelOrPackage(
+                                        pkg
+                                )
+                        );
+                        uids.add(ai.uid);
+                    } catch (Exception ignored) {}
+                }
+
+                if (packages.isEmpty()) {
+                    toast(
+                            "所选应用当前都不可用"
+                    );
+                    return;
+                }
+
+                status =
+                        "已启动多应用日志采集："
+                                + packages.size()
+                                + " 个应用";
+            } else {
+                status =
+                        "已启动全局 Logcat 记录";
+            }
+
+            String[] packageArray =
+                    packages.toArray(
+                            new String[0]
+                    );
+
+            String[] labelArray =
+                    labels.toArray(
+                            new String[0]
+                    );
+
+            int[] uidArray =
+                    new int[uids.size()];
+
+            for (int i = 0;
+                 i < uids.size();
+                 i++) {
+                uidArray[i] = uids.get(i);
+            }
+
+            prefs().edit()
+                    .putBoolean(
+                            KEY_RECORDING,
+                            true
+                    )
+                    .putInt(
+                            KEY_CAPTURE_MODE,
+                            captureMode
+                    )
+                    .apply();
+
             refreshActionState();
 
-            Intent service = new Intent(this, LogCaptureService.class)
-                    .setAction(LogCaptureService.ACTION_START)
-                    .putExtra(LogCaptureService.EXTRA_PACKAGE, selectedPackage)
-                    .putExtra(LogCaptureService.EXTRA_UID, ai.uid)
-                    .putExtra(LogCaptureService.EXTRA_LABEL, selectedAppLabel);
+            Intent service =
+                    new Intent(
+                            this,
+                            LogCaptureService.class
+                    )
+                            .setAction(
+                                    LogCaptureService
+                                            .ACTION_START
+                            )
+                            .putExtra(
+                                    LogCaptureService
+                                            .EXTRA_MODE,
+                                    captureMode
+                            )
+                            .putExtra(
+                                    LogCaptureService
+                                            .EXTRA_PACKAGES,
+                                    packageArray
+                            )
+                            .putExtra(
+                                    LogCaptureService
+                                            .EXTRA_LABELS,
+                                    labelArray
+                            )
+                            .putExtra(
+                                    LogCaptureService
+                                            .EXTRA_UIDS,
+                                    uidArray
+                            );
+
+            if (captureMode
+                    == CAPTURE_SINGLE
+                    && packageArray.length > 0) {
+
+                service.putExtra(
+                        LogCaptureService
+                                .EXTRA_PACKAGE,
+                        packageArray[0]
+                );
+
+                service.putExtra(
+                        LogCaptureService
+                                .EXTRA_LABEL,
+                        labelArray[0]
+                );
+
+                service.putExtra(
+                        LogCaptureService
+                                .EXTRA_UID,
+                        uidArray[0]
+                );
+            }
 
             startForegroundService(service);
 
             screenBuffer.setLength(0);
+
             showEmptyLogState(
                     "等待日志",
-                    "记录已经开始，正在等待目标应用输出日志"
+                    captureMode == CAPTURE_GLOBAL
+                            ? "全局记录已经开始，正在等待 Logcat 输出"
+                            : "记录已经开始，正在等待目标应用输出日志"
             );
-            setStatus(
-                    "已启动日志采集，目标 UID="
-                            + ai.uid
-                            + "。现在可以打开目标应用复现问题。"
-            );
+
+            setStatus(status);
         } catch (Exception e) {
-            prefs().edit().putBoolean(KEY_RECORDING, false).apply();
+            prefs().edit()
+                    .putBoolean(
+                            KEY_RECORDING,
+                            false
+                    )
+                    .apply();
+
             refreshActionState();
-            toast("启动记录失败：" + safeMessage(e));
+
+            toast(
+                    "启动记录失败："
+                            + safeMessage(e)
+            );
         }
     }
 
@@ -599,6 +1146,11 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void launchTarget() {
+        if (captureMode != CAPTURE_SINGLE) {
+            toast("只有单应用模式可以直接打开目标应用");
+            return;
+        }
+
         selectTypedPackageSilently();
 
         if (selectedPackage.isEmpty()) {
@@ -680,7 +1232,10 @@ public class MainActivity extends AppCompatActivity {
         if (line == null) return;
 
         boolean followTail = isLogNearBottom();
-        screenBuffer.append(line).append('\n');
+        screenBuffer.append(line);
+        if (!line.endsWith("\\n")) {
+            screenBuffer.append('\n');
+        }
 
         if (screenBuffer.length() > MAX_SCREEN_CHARS) {
             int cut = screenBuffer.length() - MAX_SCREEN_CHARS;
@@ -990,6 +1545,19 @@ public class MainActivity extends AppCompatActivity {
         }
 
         SharedPreferences preferences = prefs();
+
+        captureMode = preferences.getInt(
+                KEY_CAPTURE_MODE,
+                CAPTURE_SINGLE
+        );
+
+        restoreMultiPackages(
+                preferences.getString(
+                        KEY_MULTI_PACKAGES,
+                        ""
+                )
+        );
+
         String pkg = preferences.getString(KEY_TARGET_PACKAGE, "");
         String label = preferences.getString(KEY_TARGET_LABEL, "");
 
@@ -1029,6 +1597,13 @@ public class MainActivity extends AppCompatActivity {
             selectedLabel.setText("尚未选择目标应用");
             targetAppIcon.setImageResource(android.R.drawable.sym_def_app_icon);
         }
+
+        setCaptureMode(
+                captureMode,
+                false
+        );
+
+        updateMultiSummary();
 
         String path = preferences.getString(KEY_CURRENT_LOG_PATH, null);
 
@@ -1153,6 +1728,13 @@ public class MainActivity extends AppCompatActivity {
                 appPickerDialog.dismiss();
             } catch (Throwable ignored) {}
             appPickerDialog = null;
+        }
+
+        if (multiAppPickerDialog != null) {
+            try {
+                multiAppPickerDialog.dismiss();
+            } catch (Throwable ignored) {}
+            multiAppPickerDialog = null;
         }
 
         try {
