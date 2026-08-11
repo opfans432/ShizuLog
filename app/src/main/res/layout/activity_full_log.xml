@@ -5,8 +5,8 @@
     android:id="@+id/fullLogRoot"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:background="@color/md_theme_background">
+    android:background="@color/md_theme_background"
+    android:orientation="vertical">
 
     <com.google.android.material.appbar.MaterialToolbar
         android:id="@+id/fullLogToolbar"
@@ -82,6 +82,15 @@
                 android:layout_height="wrap_content"
                 android:layout_marginStart="6dp"
                 android:text="最后一页"
+                android:textAllCaps="false" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/fullLogRefresh"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:text="刷新"
                 android:textAllCaps="false" />
         </LinearLayout>
     </HorizontalScrollView>
