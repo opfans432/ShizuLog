@@ -68,8 +68,10 @@ public class MainActivity extends AppCompatActivity {
     private static final int CAPTURE_GLOBAL = LogCaptureService.MODE_GLOBAL;
 
     private static final int FILTER_ALL = 0;
-    private static final int FILTER_WARN = 1;
-    private static final int FILTER_ERROR = 2;
+    private static final int FILTER_DEBUG = 1;
+    private static final int FILTER_INFO = 2;
+    private static final int FILTER_WARN = 3;
+    private static final int FILTER_ERROR = 4;
 
     private static final Pattern THREADTIME_PRIORITY = Pattern.compile(
             "^\\s*\\d{2}-\\d{2}\\s+"
@@ -84,6 +86,9 @@ public class MainActivity extends AppCompatActivity {
 
     private TextInputEditText packageInput;
     private TextInputEditText logSearchInput;
+    private TextInputEditText realtimeTagInput;
+    private TextInputEditText realtimePidInput;
+    private TextInputEditText realtimeProcessInput;
     private TextView selectedLabel;
     private TextView permissionState;
     private TextView backendText;
@@ -95,12 +100,17 @@ public class MainActivity extends AppCompatActivity {
     private TextView logEmptyMessage;
     private TextView logFilterSummary;
     private TextView recordStatsText;
+    private TextView realtimeLevelStats;
+    private TextView realtimeTopTags;
+    private TextView realtimeProcessStats;
     private ScrollView logScroll;
     private ScrollView mainScroll;
     private ImageView targetAppIcon;
     private Chip heroShizukuChip;
     private Chip recordingStateChip;
     private Chip logFilterAll;
+    private Chip logFilterDebug;
+    private Chip logFilterInfo;
     private Chip logFilterWarn;
     private Chip logFilterError;
     private Chip captureModeSingle;
@@ -138,6 +148,9 @@ public class MainActivity extends AppCompatActivity {
     private int logFilterMode = FILTER_ALL;
     private int appendedLineCounter;
     private Runnable pendingLogRender;
+    private final RealTimeLogAnalyzer realtimeAnalyzer =
+            new RealTimeLogAnalyzer();
+    private long lastRealtimeUiUpdateMs;
 
     private final Shizuku.OnBinderReceivedListener binderReceivedListener = this::refreshShizukuState;
     private final Shizuku.OnBinderDeadListener binderDeadListener = this::refreshShizukuState;
@@ -212,6 +225,9 @@ public class MainActivity extends AppCompatActivity {
     private void bindViews() {
         packageInput = findViewById(R.id.packageInput);
         logSearchInput = findViewById(R.id.logSearchInput);
+        realtimeTagInput = findViewById(R.id.realtimeTagInput);
+        realtimePidInput = findViewById(R.id.realtimePidInput);
+        realtimeProcessInput = findViewById(R.id.realtimeProcessInput);
         selectedLabel = findViewById(R.id.selectedLabel);
         permissionState = findViewById(R.id.permissionState);
         backendText = findViewById(R.id.backendText);
@@ -225,6 +241,8 @@ public class MainActivity extends AppCompatActivity {
         heroShizukuChip = findViewById(R.id.heroShizukuChip);
         recordingStateChip = findViewById(R.id.recordingStateChip);
         logFilterAll = findViewById(R.id.logFilterAll);
+        logFilterDebug = findViewById(R.id.logFilterDebug);
+        logFilterInfo = findViewById(R.id.logFilterInfo);
         logFilterWarn = findViewById(R.id.logFilterWarn);
         logFilterError = findViewById(R.id.logFilterError);
         captureModeSingle = findViewById(R.id.captureModeSingle);
@@ -232,6 +250,9 @@ public class MainActivity extends AppCompatActivity {
         captureModeGlobal = findViewById(R.id.captureModeGlobal);
         logFilterSummary = findViewById(R.id.logFilterSummary);
         recordStatsText = findViewById(R.id.recordStatsText);
+        realtimeLevelStats = findViewById(R.id.realtimeLevelStats);
+        realtimeTopTags = findViewById(R.id.realtimeTopTags);
+        realtimeProcessStats = findViewById(R.id.realtimeProcessStats);
         manualPackageContainer = findViewById(R.id.manualPackageContainer);
         manualPackageToggle = findViewById(R.id.manualPackageToggle);
         logEmptyState = findViewById(R.id.logEmptyState);
@@ -334,8 +355,22 @@ public class MainActivity extends AppCompatActivity {
             @Override public void afterTextChanged(Editable s) {}
         });
 
+        addRealtimeFilterWatcher(realtimeTagInput);
+        addRealtimeFilterWatcher(realtimePidInput);
+        addRealtimeFilterWatcher(realtimeProcessInput);
+
         logFilterAll.setOnClickListener(v -> {
             logFilterMode = FILTER_ALL;
+            scheduleLogRenderPreservePage();
+        });
+
+        logFilterDebug.setOnClickListener(v -> {
+            logFilterMode = FILTER_DEBUG;
+            scheduleLogRenderPreservePage();
+        });
+
+        logFilterInfo.setOnClickListener(v -> {
+            logFilterMode = FILTER_INFO;
             scheduleLogRenderPreservePage();
         });
 
@@ -363,6 +398,33 @@ public class MainActivity extends AppCompatActivity {
         );
     }
 
+
+    private void addRealtimeFilterWatcher(TextInputEditText input) {
+        if (input == null) return;
+
+        input.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(
+                    CharSequence s,
+                    int start,
+                    int count,
+                    int after
+            ) {}
+
+            @Override
+            public void onTextChanged(
+                    CharSequence s,
+                    int start,
+                    int before,
+                    int count
+            ) {
+                scheduleLogRenderPreservePage();
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {}
+        });
+    }
 
     private void setCaptureMode(
             int mode,
@@ -1142,6 +1204,9 @@ public class MainActivity extends AppCompatActivity {
             startForegroundService(service);
 
             screenBuffer.setLength(0);
+            realtimeAnalyzer.reset();
+            lastRealtimeUiUpdateMs = 0L;
+            renderRealtimeAnalysis();
 
             if (recordStatsText != null) {
                 recordStatsText.setText(
@@ -1313,6 +1378,9 @@ public class MainActivity extends AppCompatActivity {
     private void appendLog(String line) {
         if (line == null) return;
 
+        realtimeAnalyzer.onLine(line);
+        maybeRenderRealtimeAnalysis();
+
         boolean followTail = isLogNearBottom();
         screenBuffer.append(line);
         if (!line.endsWith("\n")) {
@@ -1415,6 +1483,7 @@ public class MainActivity extends AppCompatActivity {
             total++;
 
             if (!matchesSeverity(line)) continue;
+            if (!matchesRealtimeFields(line)) continue;
 
             if (!query.isEmpty()
                     && !line.toLowerCase(Locale.ROOT).contains(query)) {
@@ -1444,17 +1513,86 @@ public class MainActivity extends AppCompatActivity {
 
         String priority = readPriority(line);
         boolean errorKeyword = containsErrorKeyword(line);
+        int rank = priorityRank(priority);
 
         if (logFilterMode == FILTER_ERROR) {
-            return "E".equals(priority)
-                    || "F".equals(priority)
-                    || errorKeyword;
+            return rank >= 5 || errorKeyword;
         }
 
-        return "W".equals(priority)
-                || "E".equals(priority)
-                || "F".equals(priority)
-                || errorKeyword;
+        if (logFilterMode == FILTER_WARN) {
+            return rank >= 4 || errorKeyword;
+        }
+
+        if (logFilterMode == FILTER_INFO) {
+            return rank >= 3 || errorKeyword;
+        }
+
+        return rank >= 2 || errorKeyword;
+    }
+
+    private static int priorityRank(String priority) {
+        if (priority == null || priority.isEmpty()) return 0;
+
+        switch (priority.charAt(0)) {
+            case 'V': return 1;
+            case 'D': return 2;
+            case 'I': return 3;
+            case 'W': return 4;
+            case 'E': return 5;
+            case 'F': return 6;
+            default: return 0;
+        }
+    }
+
+    private boolean matchesRealtimeFields(String line) {
+        String lower = line.toLowerCase(Locale.ROOT);
+
+        String tag = textOf(realtimeTagInput).trim();
+        if (!tag.isEmpty()) {
+            String lineTag = readTag(line);
+            if (!lineTag.toLowerCase(Locale.ROOT)
+                    .contains(tag.toLowerCase(Locale.ROOT))) {
+                return false;
+            }
+        }
+
+        String pid = textOf(realtimePidInput).trim();
+        if (!pid.isEmpty()) {
+            String linePid = readPid(line);
+            if (!pid.equals(linePid)) {
+                return false;
+            }
+        }
+
+        String process = textOf(realtimeProcessInput).trim();
+        if (!process.isEmpty()
+                && !lower.contains(process.toLowerCase(Locale.ROOT))) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private static String readPid(String line) {
+        Matcher matcher = Pattern.compile(
+                "^\\\\s*\\\\d{2}-\\\\d{2}\\\\s+"
+                        + "\\\\d{2}:\\\\d{2}:\\\\d{2}\\\\.\\\\d+\\\\s+"
+                        + "\\\\S+\\\\s+"
+                        + "(\\\\d+)\\\\s+"
+        ).matcher(line);
+
+        return matcher.find() ? matcher.group(1) : "";
+    }
+
+    private static String readTag(String line) {
+        Matcher matcher = Pattern.compile(
+                "^\\\\s*\\\\d{2}-\\\\d{2}\\\\s+"
+                        + "\\\\d{2}:\\\\d{2}:\\\\d{2}\\\\.\\\\d+\\\\s+"
+                        + "\\\\S+\\\\s+\\\\d+\\\\s+\\\\d+\\\\s+"
+                        + "[VDIWEF]\\\\s+([^:]+):"
+        ).matcher(line);
+
+        return matcher.find() ? matcher.group(1).trim() : "";
     }
 
     private static String readPriority(String line) {
@@ -1475,22 +1613,42 @@ public class MainActivity extends AppCompatActivity {
 
     private void updateFilterSummary(int matched, int total) {
         String mode;
-        if (logFilterMode == FILTER_ERROR) mode = "ERROR";
-        else if (logFilterMode == FILTER_WARN) mode = "WARN+";
+        if (logFilterMode == FILTER_ERROR) mode = "E+";
+        else if (logFilterMode == FILTER_WARN) mode = "W+";
+        else if (logFilterMode == FILTER_INFO) mode = "I+";
+        else if (logFilterMode == FILTER_DEBUG) mode = "D+";
         else mode = "全部";
 
         String query = textOf(logSearchInput).trim();
+        String tag = textOf(realtimeTagInput).trim();
+        String pid = textOf(realtimePidInput).trim();
+        String process = textOf(realtimeProcessInput).trim();
+
+        boolean noExtra = query.isEmpty()
+                && tag.isEmpty()
+                && pid.isEmpty()
+                && process.isEmpty()
+                && logFilterMode == FILTER_ALL;
 
         if (total == 0) {
             logFilterSummary.setText("暂无可筛选日志");
-        } else if (query.isEmpty() && logFilterMode == FILTER_ALL) {
-            logFilterSummary.setText("显示全部 " + total + " 行");
-        } else {
-            String suffix = query.isEmpty() ? "" : " · 搜索“" + query + "”";
-            logFilterSummary.setText(
-                    mode + " · 匹配 " + matched + " / " + total + " 行" + suffix
-            );
+            return;
         }
+
+        if (noExtra) {
+            logFilterSummary.setText("实时预览：显示全部 " + total + " 行");
+            return;
+        }
+
+        StringBuilder suffix = new StringBuilder();
+        if (!tag.isEmpty()) suffix.append(" · Tag=").append(tag);
+        if (!pid.isEmpty()) suffix.append(" · PID=").append(pid);
+        if (!process.isEmpty()) suffix.append(" · 进程=").append(process);
+        if (!query.isEmpty()) suffix.append(" · 搜索“").append(query).append("”");
+
+        logFilterSummary.setText(
+                mode + " · 匹配 " + matched + " / " + total + " 行" + suffix
+        );
     }
 
     private void showLogConsole() {
@@ -1553,6 +1711,56 @@ public class MainActivity extends AppCompatActivity {
         );
     }
 
+
+    private void maybeRenderRealtimeAnalysis() {
+        long now = System.currentTimeMillis();
+        if (now - lastRealtimeUiUpdateMs < 500L) {
+            return;
+        }
+
+        lastRealtimeUiUpdateMs = now;
+        uiHandler.post(this::renderRealtimeAnalysis);
+    }
+
+    private void renderRealtimeAnalysis() {
+        if (realtimeLevelStats == null
+                || realtimeTopTags == null
+                || realtimeProcessStats == null) {
+            return;
+        }
+
+        RealTimeLogAnalyzer.Snapshot snapshot =
+                realtimeAnalyzer.snapshot();
+
+        realtimeLevelStats.setText(
+                "60 秒窗口：V " + snapshot.verbose
+                        + " · D " + snapshot.debug
+                        + " · I " + snapshot.info
+                        + " · W " + snapshot.warn
+                        + " · E " + snapshot.error
+                        + " · F " + snapshot.fatal
+                        + " · " + String.format(
+                                Locale.US,
+                                "%.1f 行/s",
+                                snapshot.linesPerSecond
+                        )
+                        + " · ERROR " + String.format(
+                                Locale.US,
+                                "%.1f/min",
+                                snapshot.errorsPerMinute
+                        )
+        );
+
+        realtimeTopTags.setText(
+                "Top Tag：" + snapshot.topTagsText()
+        );
+
+        realtimeProcessStats.setText(
+                "PID：" + snapshot.activePidCount
+                        + " · 进程变化 " + snapshot.pidChanges
+                        + " · 最近：" + snapshot.latestProcessChange
+        );
+    }
 
     private void openDiagnosticPack() {
         if (currentLogPath == null || !new File(currentLogPath).isFile()) {

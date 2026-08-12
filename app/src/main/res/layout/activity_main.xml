@@ -605,6 +605,60 @@
                         android:textColor="@color/md_theme_onSurfaceVariant"
                         android:textSize="12sp" />
 
+
+                    <com.google.android.material.card.MaterialCardView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        app:cardBackgroundColor="@color/card_surface"
+                        app:cardCornerRadius="16dp"
+                        app:cardElevation="0dp"
+                        app:strokeColor="@color/md_theme_outlineVariant"
+                        app:strokeWidth="1dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical"
+                            android:padding="12dp">
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="实时分析 · 最近 60 秒"
+                                android:textColor="@color/md_theme_onSurface"
+                                android:textSize="14sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:id="@+id/realtimeLevelStats"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="5dp"
+                                android:text="60 秒窗口：等待日志…"
+                                android:textColor="@color/md_theme_onSurfaceVariant"
+                                android:textSize="12sp" />
+
+                            <TextView
+                                android:id="@+id/realtimeTopTags"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="3dp"
+                                android:text="Top Tag：—"
+                                android:textColor="@color/md_theme_onSurfaceVariant"
+                                android:textSize="12sp" />
+
+                            <TextView
+                                android:id="@+id/realtimeProcessStats"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="3dp"
+                                android:text="PID：0 · 进程变化 0 · 最近：—"
+                                android:textColor="@color/md_theme_onSurfaceVariant"
+                                android:textSize="12sp" />
+                        </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
+
                     <LinearLayout
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
@@ -691,19 +745,84 @@
                             android:text="全部" />
 
                         <com.google.android.material.chip.Chip
+                            android:id="@+id/logFilterDebug"
+                            style="@style/Widget.Material3.Chip.Filter"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="D+" />
+
+                        <com.google.android.material.chip.Chip
+                            android:id="@+id/logFilterInfo"
+                            style="@style/Widget.Material3.Chip.Filter"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="I+" />
+
+                        <com.google.android.material.chip.Chip
                             android:id="@+id/logFilterWarn"
                             style="@style/Widget.Material3.Chip.Filter"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="WARN+" />
+                            android:text="W+" />
 
                         <com.google.android.material.chip.Chip
                             android:id="@+id/logFilterError"
                             style="@style/Widget.Material3.Chip.Filter"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="ERROR" />
+                            android:text="E+" />
                     </com.google.android.material.chip.ChipGroup>
+
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:orientation="horizontal">
+
+                        <com.google.android.material.textfield.TextInputLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:hint="Tag">
+
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/realtimeTagInput"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:maxLines="1"
+                                android:singleLine="true" />
+                        </com.google.android.material.textfield.TextInputLayout>
+
+                        <com.google.android.material.textfield.TextInputLayout
+                            android:layout_width="98dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="6dp"
+                            android:hint="PID">
+
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/realtimePidInput"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:inputType="number"
+                                android:maxLines="1"
+                                android:singleLine="true" />
+                        </com.google.android.material.textfield.TextInputLayout>
+                    </LinearLayout>
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:hint="进程 / 包名关键字（仅过滤实时预览）">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/realtimeProcessInput"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:maxLines="1"
+                            android:singleLine="true" />
+                    </com.google.android.material.textfield.TextInputLayout>
 
                     <TextView
                         android:id="@+id/logFilterSummary"
