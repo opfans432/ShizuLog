@@ -866,6 +866,27 @@ public class LogHistoryActivity extends AppCompatActivity {
     }
 
 
+    private void openDiagnosticPack(File file) {
+        if (file == null
+                || !file.isFile()) {
+            toast("日志文件不存在");
+            return;
+        }
+
+        Intent intent =
+                new Intent(
+                        this,
+                        DiagnosticPackActivity.class
+                );
+
+        intent.putExtra(
+                DiagnosticPackActivity.EXTRA_FILE,
+                file.getAbsolutePath()
+        );
+
+        startActivity(intent);
+    }
+
     private void openCrashAnalysis(File file) {
         if (file == null
                 || !file.isFile()) {
@@ -1365,6 +1386,10 @@ public class LogHistoryActivity extends AppCompatActivity {
                         convertView.findViewById(
                                 R.id.historyItemAnalyze
                         );
+                holder.diagnostic =
+                        convertView.findViewById(
+                                R.id.historyItemDiagnostic
+                        );
                 holder.export =
                         convertView.findViewById(
                                 R.id.historyItemExport
@@ -1455,6 +1480,12 @@ public class LogHistoryActivity extends AppCompatActivity {
                     )
             );
 
+            holder.diagnostic.setOnClickListener(
+                    v -> openDiagnosticPack(
+                            entry.file
+                    )
+            );
+
             holder.export.setOnClickListener(
                     v -> requestExport(
                             entry.file
@@ -1482,6 +1513,7 @@ public class LogHistoryActivity extends AppCompatActivity {
         TextView packages;
         TextView crash;
         MaterialButton analyze;
+        MaterialButton diagnostic;
         MaterialButton export;
         MaterialButton delete;
     }

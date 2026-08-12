@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <strong>当前版本：v1.6.0</strong>
+  <strong>当前版本：v1.6.1</strong>
 </p>
 
 ---
@@ -201,7 +201,7 @@ com.google.android.material:material:1.13.0
 
 ## 版本
 
-当前版本：**v1.6.0**
+当前版本：**v1.6.1**
 
 详细更新内容见 [`RELEASE_NOTES.md`](RELEASE_NOTES.md)。
 
@@ -224,3 +224,12 @@ v1.5.1 新增本地崩溃分析器。
 - 崩溃堆栈片段
 
 分析过程在设备本地完成，不会自动上传日志。
+
+
+## 诊断包隐私
+
+v1.6.1 的诊断包默认使用脱敏模式，会尝试遮盖常见 Token、Authorization、Cookie、API Key、Session、密码字段和 JWT；需要完整原始信息时仍可手动选择“原始版”。
+
+历史日志也可以直接生成诊断包，并优先使用日志文件头保存的记录模式与目标应用信息。
+
+每个诊断包附带 `manifest-sha256.txt` 完整性清单。

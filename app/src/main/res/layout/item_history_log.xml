@@ -97,6 +97,15 @@
                 android:visibility="gone" />
 
             <com.google.android.material.button.MaterialButton
+                android:id="@+id/historyItemDiagnostic"
+                style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:minWidth="0dp"
+                android:text="诊断包"
+                android:textAllCaps="false" />
+
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/historyItemExport"
                 style="@style/Widget.Material3.Button.TextButton"
                 android:layout_width="wrap_content"
