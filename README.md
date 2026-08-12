@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <strong>当前版本：v1.5.0</strong>
+  <strong>当前版本：v1.5.1</strong>
 </p>
 
 ---
@@ -201,10 +201,26 @@ com.google.android.material:material:1.13.0
 
 ## 版本
 
-当前版本：**v1.5.0**
+当前版本：**v1.5.1**
 
 详细更新内容见 [`RELEASE_NOTES.md`](RELEASE_NOTES.md)。
 
 ## 许可证
 
 本项目使用 [MIT License](LICENSE)。
+
+## 崩溃分析
+
+v1.5.1 新增本地崩溃分析器。
+
+可从当前日志或历史日志进入，自动识别 Java / Kotlin `FATAL EXCEPTION`、ANR、SIGSEGV、SIGABRT 等常见崩溃，并尝试提取：
+
+- 崩溃类型
+- 进程 / PID
+- 线程
+- 异常类或 Native signal
+- `Caused by` 根因
+- 关键调用位置
+- 崩溃堆栈片段
+
+分析过程在设备本地完成，不会自动上传日志。

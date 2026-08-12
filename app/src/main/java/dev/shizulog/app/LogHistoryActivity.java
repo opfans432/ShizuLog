@@ -865,6 +865,28 @@ public class LogHistoryActivity extends AppCompatActivity {
         return true;
     }
 
+
+    private void openCrashAnalysis(File file) {
+        if (file == null
+                || !file.isFile()) {
+            toast("日志文件不存在");
+            return;
+        }
+
+        Intent intent =
+                new Intent(
+                        this,
+                        CrashAnalysisActivity.class
+                );
+
+        intent.putExtra(
+                CrashAnalysisActivity.EXTRA_FILE,
+                file.getAbsolutePath()
+        );
+
+        startActivity(intent);
+    }
+
     private void openLog(File file) {
         Intent intent =
                 new Intent(
@@ -1339,6 +1361,10 @@ public class LogHistoryActivity extends AppCompatActivity {
                         convertView.findViewById(
                                 R.id.historyItemCrash
                         );
+                holder.analyze =
+                        convertView.findViewById(
+                                R.id.historyItemAnalyze
+                        );
                 holder.export =
                         convertView.findViewById(
                                 R.id.historyItemExport
@@ -1417,6 +1443,18 @@ public class LogHistoryActivity extends AppCompatActivity {
                             : View.GONE
             );
 
+            holder.analyze.setVisibility(
+                    entry.hasCrash
+                            ? View.VISIBLE
+                            : View.GONE
+            );
+
+            holder.analyze.setOnClickListener(
+                    v -> openCrashAnalysis(
+                            entry.file
+                    )
+            );
+
             holder.export.setOnClickListener(
                     v -> requestExport(
                             entry.file
@@ -1443,6 +1481,7 @@ public class LogHistoryActivity extends AppCompatActivity {
         TextView meta;
         TextView packages;
         TextView crash;
+        MaterialButton analyze;
         MaterialButton export;
         MaterialButton delete;
     }

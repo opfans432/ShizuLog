@@ -118,6 +118,7 @@ public class MainActivity extends AppCompatActivity {
     private MaterialButton exportButton;
     private MaterialButton snapshotButton;
     private MaterialButton viewFullLogButton;
+    private MaterialButton analyzeCrashButton;
     private MaterialButton historyLogButton;
     private MaterialButton chooseTargetButton;
     private MaterialButton chooseMultiTargetButton;
@@ -246,6 +247,7 @@ public class MainActivity extends AppCompatActivity {
         exportButton = findViewById(R.id.exportButton);
         snapshotButton = findViewById(R.id.snapshotButton);
         viewFullLogButton = findViewById(R.id.viewFullLogButton);
+        analyzeCrashButton = findViewById(R.id.analyzeCrashButton);
         historyLogButton = findViewById(R.id.historyLogButton);
         chooseTargetButton = findViewById(R.id.chooseTargetButton);
         chooseMultiTargetButton = findViewById(R.id.chooseMultiTargetButton);
@@ -291,6 +293,10 @@ public class MainActivity extends AppCompatActivity {
 
         viewFullLogButton.setOnClickListener(
                 v -> openCurrentFullLog()
+        );
+
+        analyzeCrashButton.setOnClickListener(
+                v -> analyzeCurrentCrash()
         );
 
         historyLogButton.setOnClickListener(
@@ -687,6 +693,10 @@ public class MainActivity extends AppCompatActivity {
         );
 
         viewFullLogButton.setEnabled(
+                hasLogFile
+        );
+
+        analyzeCrashButton.setEnabled(
                 hasLogFile
         );
 
@@ -1531,6 +1541,28 @@ public class MainActivity extends AppCompatActivity {
                 pendingLogRender,
                 60L
         );
+    }
+
+
+    private void analyzeCurrentCrash() {
+        if (currentLogPath == null
+                || !new File(currentLogPath).isFile()) {
+            toast("还没有可分析的日志");
+            return;
+        }
+
+        Intent intent =
+                new Intent(
+                        this,
+                        CrashAnalysisActivity.class
+                );
+
+        intent.putExtra(
+                CrashAnalysisActivity.EXTRA_FILE,
+                currentLogPath
+        );
+
+        startActivity(intent);
     }
 
     private void openCurrentFullLog() {

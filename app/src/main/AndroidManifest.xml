@@ -31,6 +31,10 @@
             android:exported="false" />
 
         <activity
+            android:name=".CrashAnalysisActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".AboutActivity"
             android:exported="false" />
 
