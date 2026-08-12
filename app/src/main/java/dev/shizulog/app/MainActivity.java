@@ -196,6 +196,22 @@ public class MainActivity extends AppCompatActivity {
                     updateLogMeta();
                 }
 
+                CaptureSessionManager.updateActive(
+                        MainActivity.this,
+                        status,
+                        path
+                );
+
+                if (status != null
+                        && (status.contains("已停止")
+                        || status.contains("记录结束")
+                        || status.contains("采集结束"))) {
+                    CaptureSessionManager.finishActive(
+                            MainActivity.this,
+                            status
+                    );
+                }
+
                 refreshActionState();
             }
         }
@@ -211,6 +227,10 @@ public class MainActivity extends AppCompatActivity {
         setupActions();
 
         restoreUiState();
+        CaptureSessionManager.recoverStaleActive(
+                this,
+                prefs().getBoolean(KEY_RECORDING, false)
+        );
         registerStatusReceiver();
 
         Shizuku.addBinderReceivedListenerSticky(binderReceivedListener);
@@ -1135,6 +1155,14 @@ public class MainActivity extends AppCompatActivity {
                 uidArray[i] = uids.get(i);
             }
 
+            CaptureSessionManager.begin(
+                    this,
+                    captureMode,
+                    packageArray,
+                    labelArray,
+                    uidArray
+            );
+
             prefs().edit()
                     .putBoolean(
                             KEY_RECORDING,
@@ -1223,6 +1251,11 @@ public class MainActivity extends AppCompatActivity {
 
             setStatus(status);
         } catch (Exception e) {
+            CaptureSessionManager.finishActive(
+                    this,
+                    "启动失败：" + safeMessage(e)
+            );
+
             prefs().edit()
                     .putBoolean(
                             KEY_RECORDING,
@@ -1319,6 +1352,11 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void stopCapture() {
+        CaptureSessionManager.finishActive(
+                this,
+                "用户停止记录"
+        );
+
         prefs().edit().putBoolean(KEY_RECORDING, false).apply();
         refreshActionState();
 
