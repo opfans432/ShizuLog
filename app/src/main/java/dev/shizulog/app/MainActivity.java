@@ -119,6 +119,7 @@ public class MainActivity extends AppCompatActivity {
     private MaterialButton snapshotButton;
     private MaterialButton viewFullLogButton;
     private MaterialButton analyzeCrashButton;
+    private MaterialButton diagnosticPackButton;
     private MaterialButton historyLogButton;
     private MaterialButton chooseTargetButton;
     private MaterialButton chooseMultiTargetButton;
@@ -248,6 +249,7 @@ public class MainActivity extends AppCompatActivity {
         snapshotButton = findViewById(R.id.snapshotButton);
         viewFullLogButton = findViewById(R.id.viewFullLogButton);
         analyzeCrashButton = findViewById(R.id.analyzeCrashButton);
+        diagnosticPackButton = findViewById(R.id.diagnosticPackButton);
         historyLogButton = findViewById(R.id.historyLogButton);
         chooseTargetButton = findViewById(R.id.chooseTargetButton);
         chooseMultiTargetButton = findViewById(R.id.chooseMultiTargetButton);
@@ -297,6 +299,10 @@ public class MainActivity extends AppCompatActivity {
 
         analyzeCrashButton.setOnClickListener(
                 v -> analyzeCurrentCrash()
+        );
+
+        diagnosticPackButton.setOnClickListener(
+                v -> openDiagnosticPack()
         );
 
         historyLogButton.setOnClickListener(
@@ -697,6 +703,10 @@ public class MainActivity extends AppCompatActivity {
         );
 
         analyzeCrashButton.setEnabled(
+                hasLogFile
+        );
+
+        diagnosticPackButton.setEnabled(
                 hasLogFile
         );
 
@@ -1543,6 +1553,16 @@ public class MainActivity extends AppCompatActivity {
         );
     }
 
+
+    private void openDiagnosticPack() {
+        if (currentLogPath == null || !new File(currentLogPath).isFile()) {
+            toast("还没有可导出的日志");
+            return;
+        }
+        Intent intent = new Intent(this, DiagnosticPackActivity.class);
+        intent.putExtra(DiagnosticPackActivity.EXTRA_FILE, currentLogPath);
+        startActivity(intent);
+    }
 
     private void analyzeCurrentCrash() {
         if (currentLogPath == null

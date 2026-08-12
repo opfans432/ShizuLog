@@ -631,6 +631,16 @@
                             android:textAllCaps="false" />
 
                         <com.google.android.material.button.MaterialButton
+                            android:id="@+id/diagnosticPackButton"
+                            style="@style/Widget.Material3.Button.OutlinedButton"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="6dp"
+                            android:layout_weight="1"
+                            android:text="诊断包"
+                            android:textAllCaps="false" />
+
+                        <com.google.android.material.button.MaterialButton
                             android:id="@+id/historyLogButton"
                             style="@style/Widget.Material3.Button.OutlinedButton"
                             android:layout_width="0dp"

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/diagnosticRoot" android:layout_width="match_parent" android:layout_height="match_parent" android:background="@color/md_theme_background" android:orientation="vertical">
+    <com.google.android.material.appbar.MaterialToolbar android:id="@+id/diagnosticToolbar" android:layout_width="match_parent" android:layout_height="?attr/actionBarSize" android:background="@color/md_theme_background" app:title="诊断包" app:titleTextColor="@color/md_theme_onBackground" />
+    <ScrollView android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="16dp">
+            <com.google.android.material.card.MaterialCardView android:layout_width="match_parent" android:layout_height="wrap_content" app:cardBackgroundColor="@color/card_surface" app:cardCornerRadius="22dp" app:strokeColor="@color/md_theme_outlineVariant" app:strokeWidth="1dp">
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="18dp">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="一键诊断包" android:textColor="@color/md_theme_onSurface" android:textSize="20sp" android:textStyle="bold" />
+                    <TextView android:id="@+id/diagnosticState" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="准备生成诊断包" android:textColor="@color/md_theme_secondary" android:textSize="14sp" android:textStyle="bold" />
+                    <ProgressBar android:id="@+id/diagnosticProgress" style="?android:attr/progressBarStyleHorizontal" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp" android:indeterminate="true" android:visibility="gone" />
+                    <TextView android:id="@+id/diagnosticInfo" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:textColor="@color/md_theme_onSurfaceVariant" android:textIsSelectable="true" android:textSize="13sp" />
+                    <com.google.android.material.button.MaterialButton android:id="@+id/diagnosticGenerate" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="18dp" android:text="生成诊断包" android:textAllCaps="false" app:cornerRadius="16dp" />
+                    <com.google.android.material.button.MaterialButton android:id="@+id/diagnosticShare" style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:text="分享诊断包" android:textAllCaps="false" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+            <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="14dp" android:background="@color/card_surface" android:padding="14dp" android:text="诊断包不会主动包含发布签名私钥、GitHub Secret 或其他应用私有文件。但原始 Logcat 本身可能含有敏感信息，分享前请确认接收方可信。" android:textColor="@color/md_theme_onSurfaceVariant" android:textSize="12sp" />
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>
