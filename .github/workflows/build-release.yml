@@ -29,15 +29,20 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Install Android SDK 35
+      - name: Set up Android SDK 35
+        uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
+
+      - name: Verify Android tools
         shell: bash
         run: |
           set -euo pipefail
-          yes | sdkmanager --licenses >/dev/null 2>&1 || true
-          sdkmanager \
-            "platform-tools" \
-            "platforms;android-35" \
-            "build-tools;35.0.0"
+          command -v sdkmanager
+          command -v adb
+          test -x "$ANDROID_SDK_ROOT/build-tools/35.0.0/apksigner"
+          test -x "$ANDROID_SDK_ROOT/build-tools/35.0.0/zipalign"
+          sdkmanager --version
 
       - name: Check signing secrets
         shell: bash
