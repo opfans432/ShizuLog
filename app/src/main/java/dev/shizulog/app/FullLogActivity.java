@@ -9,6 +9,7 @@ import android.text.Spanned;
 import android.text.style.BackgroundColorSpan;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.EditText;
 import android.widget.HorizontalScrollView;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -21,7 +22,9 @@ import androidx.core.view.WindowInsetsCompat;
 
 import com.google.android.material.appbar.MaterialToolbar;
 import com.google.android.material.button.MaterialButton;
+import com.google.android.material.button.MaterialButtonToggleGroup;
 import com.google.android.material.checkbox.MaterialCheckBox;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.textfield.TextInputEditText;
 
 import java.io.File;
@@ -54,6 +57,7 @@ public class FullLogActivity
     private TextView pageText;
     private TextView pageIndicator;
     private TextView searchStatus;
+    private TextView filterStatus;
 
     private MaterialButton firstButton;
     private MaterialButton prevButton;
@@ -71,8 +75,26 @@ public class FullLogActivity
     private MaterialButton largerTextButton;
     private MaterialButton wrapButton;
 
+    private MaterialButton filterApplyButton;
+    private MaterialButton filterPrevButton;
+    private MaterialButton filterNextButton;
+    private MaterialButton filterPresetButton;
+    private MaterialButton filterSavePresetButton;
+    private MaterialButton filterClearButton;
+
+    private MaterialButton addBookmarkButton;
+    private MaterialButton bookmarkListButton;
+    private MaterialButton removeBookmarkButton;
+
     private TextInputEditText searchInput;
     private MaterialCheckBox regexCheck;
+
+    private TextInputEditText filterTagInput;
+    private TextInputEditText filterPidInput;
+    private TextInputEditText filterProcessInput;
+    private TextInputEditText filterTextInput;
+    private MaterialCheckBox filterCrashOnly;
+    private MaterialButtonToggleGroup filterLevelGroup;
 
     private ScrollView verticalScroll;
     private HorizontalScrollView horizontalScroll;
@@ -95,9 +117,15 @@ public class FullLogActivity
             errorMatches =
                     new ArrayList<>();
 
+    private final List<LogFilterEngine.Match>
+            filterMatches =
+                    new ArrayList<>();
+
     private int currentMatchIndex = -1;
+    private int currentFilterIndex = -1;
     private boolean errorIndexLoaded;
     private long searchGeneration;
+    private long filterGeneration;
 
     private long pageStartOffset;
     private long pageFirstLineNumber = 1L;
@@ -105,6 +133,10 @@ public class FullLogActivity
 
     private Long pendingHighlightLine;
     private String pendingHighlightText;
+
+    private long anchorOffset;
+    private long anchorLine = 1L;
+    private String anchorPreview = "";
 
     @Override
     protected void onCreate(
@@ -170,6 +202,11 @@ public class FullLogActivity
         searchStatus =
                 findViewById(
                         R.id.fullLogSearchStatus
+                );
+
+        filterStatus =
+                findViewById(
+                        R.id.fullLogFilterStatus
                 );
 
         firstButton =
@@ -251,6 +288,23 @@ public class FullLogActivity
                 findViewById(
                         R.id.fullLogRegex
                 );
+
+        filterTagInput = findViewById(R.id.fullLogFilterTag);
+        filterPidInput = findViewById(R.id.fullLogFilterPid);
+        filterProcessInput = findViewById(R.id.fullLogFilterProcess);
+        filterTextInput = findViewById(R.id.fullLogFilterText);
+        filterCrashOnly = findViewById(R.id.fullLogFilterCrashOnly);
+        filterLevelGroup = findViewById(R.id.fullLogFilterLevelGroup);
+        filterLevelGroup.check(R.id.fullLogLevelAll);
+        filterApplyButton = findViewById(R.id.fullLogFilterApply);
+        filterPrevButton = findViewById(R.id.fullLogFilterPrev);
+        filterNextButton = findViewById(R.id.fullLogFilterNext);
+        filterPresetButton = findViewById(R.id.fullLogFilterPreset);
+        filterSavePresetButton = findViewById(R.id.fullLogFilterSavePreset);
+        filterClearButton = findViewById(R.id.fullLogFilterClear);
+        addBookmarkButton = findViewById(R.id.fullLogBookmarkAdd);
+        bookmarkListButton = findViewById(R.id.fullLogBookmarkList);
+        removeBookmarkButton = findViewById(R.id.fullLogBookmarkRemove);
 
         verticalScroll =
                 findViewById(
@@ -364,7 +418,19 @@ public class FullLogActivity
                 }
         );
 
+        filterApplyButton.setOnClickListener(v -> runWholeFileFilter());
+        filterPrevButton.setOnClickListener(v -> jumpRelativeFilter(-1));
+        filterNextButton.setOnClickListener(v -> jumpRelativeFilter(1));
+        filterPresetButton.setOnClickListener(v -> showPresetDialog());
+        filterSavePresetButton.setOnClickListener(v -> showSavePresetDialog());
+        filterClearButton.setOnClickListener(v -> clearFilterUi());
+        addBookmarkButton.setOnClickListener(v -> addCurrentBookmark());
+        bookmarkListButton.setOnClickListener(v -> showBookmarks());
+        removeBookmarkButton.setOnClickListener(v -> removeCurrentBookmark());
+
         updateSearchButtons();
+        updateFilterButtons();
+        updateBookmarkButtons();
         applyTextSize();
         applyWrapMode();
         loadPage(pageIndex);
@@ -396,6 +462,296 @@ public class FullLogActivity
 
             loadPage(pageIndex);
         }
+    }
+
+    // ----- v1.8.0 whole-file filtering -----
+
+    private void runWholeFileFilter() {
+        LogFilterEngine.Spec spec = currentFilterSpec();
+        final long generation = ++filterGeneration;
+        filterStatus.setText("正在筛选整份日志…");
+        filterApplyButton.setEnabled(false);
+
+        executor.execute(() -> {
+            LogFilterEngine.Result result;
+            try {
+                result = LogFilterEngine.filter(file, spec);
+            } catch (Exception e) {
+                result = LogFilterEngine.Result.error(safeMessage(e));
+            }
+
+            final LogFilterEngine.Result finalResult = result;
+            runOnUiThread(() -> {
+                if (isFinishing() || isDestroyed() || generation != filterGeneration) return;
+                filterApplyButton.setEnabled(true);
+                filterMatches.clear();
+                currentFilterIndex = -1;
+
+                if (!finalResult.success) {
+                    filterStatus.setText(finalResult.error);
+                    updateFilterButtons();
+                    return;
+                }
+
+                filterMatches.addAll(finalResult.matches);
+                if (filterMatches.isEmpty()) {
+                    filterStatus.setText("筛选结果：0 条");
+                    updateFilterButtons();
+                    return;
+                }
+
+                filterStatus.setText("筛选结果：" + filterMatches.size() + " 条"
+                        + (finalResult.truncated ? "（达到 5000 条索引上限）" : ""));
+                currentFilterIndex = 0;
+                jumpToFilterMatch(filterMatches.get(0));
+                updateFilterButtons();
+            });
+        });
+    }
+
+    private LogFilterEngine.Spec currentFilterSpec() {
+        int pid = 0;
+        String pidText = textOf(filterPidInput);
+        if (!pidText.isEmpty()) {
+            try {
+                pid = Integer.parseInt(pidText);
+            } catch (NumberFormatException ignored) {
+                toast("PID 必须是数字");
+            }
+        }
+
+        return new LogFilterEngine.Spec(
+                selectedMinLevel(),
+                textOf(filterTagInput),
+                pid,
+                textOf(filterProcessInput),
+                textOf(filterTextInput),
+                filterCrashOnly.isChecked()
+        );
+    }
+
+    private int selectedMinLevel() {
+        int checked = filterLevelGroup.getCheckedButtonId();
+        if (checked == R.id.fullLogLevelDebug) return 2;
+        if (checked == R.id.fullLogLevelInfo) return 3;
+        if (checked == R.id.fullLogLevelWarn) return 4;
+        if (checked == R.id.fullLogLevelError) return 5;
+        return 0;
+    }
+
+    private void applyFilterSpec(LogFilterEngine.Spec spec) {
+        if (spec == null) spec = LogFilterEngine.Spec.all();
+        setText(filterTagInput, spec.tag);
+        setText(filterPidInput, spec.pid > 0 ? String.valueOf(spec.pid) : "");
+        setText(filterProcessInput, spec.processKeyword);
+        setText(filterTextInput, spec.textKeyword);
+        filterCrashOnly.setChecked(spec.crashOnly);
+
+        int button = R.id.fullLogLevelAll;
+        if (spec.minLevel == 2) button = R.id.fullLogLevelDebug;
+        else if (spec.minLevel == 3) button = R.id.fullLogLevelInfo;
+        else if (spec.minLevel == 4) button = R.id.fullLogLevelWarn;
+        else if (spec.minLevel >= 5) button = R.id.fullLogLevelError;
+        filterLevelGroup.check(button);
+    }
+
+    private void jumpRelativeFilter(int delta) {
+        if (filterMatches.isEmpty()) {
+            toast("请先应用筛选");
+            return;
+        }
+        int size = filterMatches.size();
+        if (currentFilterIndex < 0) currentFilterIndex = 0;
+        else currentFilterIndex = (currentFilterIndex + delta + size) % size;
+        LogFilterEngine.Match match = filterMatches.get(currentFilterIndex);
+        filterStatus.setText("筛选 " + (currentFilterIndex + 1) + " / " + size
+                + " · 行 " + match.lineNumber);
+        jumpToFilterMatch(match);
+    }
+
+    private void jumpToFilterMatch(LogFilterEngine.Match match) {
+        if (match == null) return;
+        setAnchor(match.byteOffset, match.lineNumber, match.line);
+        pendingHighlightLine = match.lineNumber;
+        pendingHighlightText = match.line;
+        updateBookmarkButtons();
+        loadPage((int) Math.min(Integer.MAX_VALUE, match.byteOffset / PAGE_BYTES));
+    }
+
+    private void updateFilterButtons() {
+        boolean has = !filterMatches.isEmpty();
+        filterPrevButton.setEnabled(has);
+        filterNextButton.setEnabled(has);
+    }
+
+    private void clearFilterUi() {
+        ++filterGeneration;
+        filterMatches.clear();
+        currentFilterIndex = -1;
+        applyFilterSpec(LogFilterEngine.Spec.all());
+        filterStatus.setText("未应用过滤");
+        updateFilterButtons();
+    }
+
+    private void showPresetDialog() {
+        List<String> names = new ArrayList<>();
+        List<LogFilterEngine.Spec> specs = new ArrayList<>();
+
+        names.add("全部日志");
+        specs.add(LogFilterEngine.Spec.all());
+        names.add("警告及以上");
+        specs.add(new LogFilterEngine.Spec(4, "", 0, "", "", false));
+        names.add("错误及以上");
+        specs.add(new LogFilterEngine.Spec(5, "", 0, "", "", false));
+        names.add("崩溃标记");
+        specs.add(new LogFilterEngine.Spec(0, "", 0, "", "", true));
+
+        android.content.SharedPreferences statePrefs =
+                getSharedPreferences("shizulog_state", MODE_PRIVATE);
+        String targetPackage = statePrefs.getString("target_package", "");
+        if (targetPackage == null || targetPackage.trim().isEmpty()) {
+            targetPackage = statePrefs.getString("selected_package", "");
+        }
+        if (targetPackage != null && !targetPackage.trim().isEmpty()) {
+            names.add("当前目标包：" + targetPackage);
+            specs.add(new LogFilterEngine.Spec(0, "", 0, targetPackage, "", false));
+        }
+
+        List<LogFilterPresetStore.Preset> custom = LogFilterPresetStore.load(this);
+        for (LogFilterPresetStore.Preset item : custom) {
+            names.add("自定义 · " + item.name);
+            specs.add(item.spec);
+        }
+
+        new MaterialAlertDialogBuilder(this)
+                .setTitle("过滤预设")
+                .setItems(names.toArray(new String[0]), (dialog, which) -> {
+                    applyFilterSpec(specs.get(which));
+                    filterStatus.setText("已载入：" + names.get(which));
+                })
+                .setNegativeButton("关闭", null)
+                .show();
+    }
+
+    private void showSavePresetDialog() {
+        EditText input = new EditText(this);
+        input.setHint("例如：HOH4 网络错误");
+        input.setSingleLine(true);
+        int pad = (int) (20 * getResources().getDisplayMetrics().density);
+        input.setPadding(pad, pad / 2, pad, pad / 2);
+
+        new MaterialAlertDialogBuilder(this)
+                .setTitle("保存过滤预设")
+                .setView(input)
+                .setPositiveButton("保存", (dialog, which) -> {
+                    String name = input.getText().toString().trim();
+                    if (name.isEmpty()) {
+                        toast("预设名称不能为空");
+                        return;
+                    }
+                    LogFilterPresetStore.saveOrReplace(
+                            this, new LogFilterPresetStore.Preset(name, currentFilterSpec()));
+                    toast("过滤预设已保存");
+                })
+                .setNegativeButton("取消", null)
+                .show();
+    }
+
+    // ----- persistent bookmarks -----
+
+    private void addCurrentBookmark() {
+        if (file == null || !file.isFile()) return;
+        LogBookmarkStore.Bookmark bookmark = new LogBookmarkStore.Bookmark(
+                anchorOffset, anchorLine, cleanPreview(anchorPreview), System.currentTimeMillis());
+        boolean added = LogBookmarkStore.add(this, file, bookmark);
+        toast(added ? "已收藏第 " + anchorLine + " 行" : "这一行已经收藏");
+        updateBookmarkButtons();
+    }
+
+    private void removeCurrentBookmark() {
+        boolean removed = LogBookmarkStore.removeLine(this, file, anchorLine);
+        toast(removed ? "已取消收藏" : "当前位置没有书签");
+        updateBookmarkButtons();
+    }
+
+    private void showBookmarks() {
+        List<LogBookmarkStore.Bookmark> bookmarks = LogBookmarkStore.load(this, file);
+        if (bookmarks.isEmpty()) {
+            toast("当前日志还没有书签");
+            return;
+        }
+
+        String[] labels = new String[bookmarks.size()];
+        for (int i = 0; i < bookmarks.size(); i++) {
+            LogBookmarkStore.Bookmark item = bookmarks.get(i);
+            labels[i] = "L" + item.lineNumber + " · " + cleanPreview(item.preview);
+        }
+
+        new MaterialAlertDialogBuilder(this)
+                .setTitle("日志书签 · " + bookmarks.size())
+                .setItems(labels, (dialog, which) -> {
+                    LogBookmarkStore.Bookmark item = bookmarks.get(which);
+                    setAnchor(item.byteOffset, item.lineNumber, item.preview);
+                    pendingHighlightLine = item.lineNumber;
+                    pendingHighlightText = item.preview;
+                    loadPage((int) Math.min(Integer.MAX_VALUE, item.byteOffset / PAGE_BYTES));
+                    updateBookmarkButtons();
+                })
+                .setNeutralButton("清空全部", (dialog, which) -> {
+                    LogBookmarkStore.clear(this, file);
+                    updateBookmarkButtons();
+                    toast("已清空当前日志书签");
+                })
+                .setNegativeButton("关闭", null)
+                .show();
+    }
+
+    private void updateBookmarkButtons() {
+        if (file == null || bookmarkListButton == null) return;
+        List<LogBookmarkStore.Bookmark> bookmarks = LogBookmarkStore.load(this, file);
+        bookmarkListButton.setText("书签 " + bookmarks.size());
+        boolean saved = false;
+        for (LogBookmarkStore.Bookmark item : bookmarks) {
+            if (item.lineNumber == anchorLine) {
+                saved = true;
+                break;
+            }
+        }
+        addBookmarkButton.setEnabled(!saved);
+        removeBookmarkButton.setEnabled(saved);
+    }
+
+    private void setAnchor(long offset, long line, String preview) {
+        anchorOffset = Math.max(0L, offset);
+        anchorLine = Math.max(1L, line);
+        anchorPreview = preview == null ? "" : preview;
+    }
+
+    private static String firstLine(String text) {
+        if (text == null || text.isEmpty()) return "";
+        int newline = text.indexOf('\n');
+        return newline >= 0 ? text.substring(0, newline) : text;
+    }
+
+    private static String cleanPreview(String value) {
+        if (value == null) return "";
+        String clean = value.replace('\n', ' ').replace('\r', ' ').trim();
+        return clean.length() > 72 ? clean.substring(0, 72) + "…" : clean;
+    }
+
+    private static String textOf(TextInputEditText input) {
+        return input == null || input.getText() == null
+                ? "" : input.getText().toString().trim();
+    }
+
+    private static void setText(TextInputEditText input, String value) {
+        if (input != null) input.setText(value == null ? "" : value);
+    }
+
+    private static String safeMessage(Throwable error) {
+        if (error == null) return "未知错误";
+        String message = error.getMessage();
+        return message == null ? error.getClass().getSimpleName() : message;
     }
 
     private void runWholeFileSearch() {
@@ -650,61 +1006,42 @@ public class FullLogActivity
         pendingHighlightText =
                 match.line;
 
+        setAnchor(
+                match.byteOffset,
+                match.lineNumber,
+                match.line
+        );
+
+        updateBookmarkButtons();
         loadPage(targetPage);
     }
 
     private void copyCurrentMatchContext() {
-        LogSearchEngine.Match match =
-                getCurrentMatch();
-
-        if (match == null) {
-            toast("请先搜索并选择一个匹配项");
+        if (file == null || !file.isFile()) {
+            toast("日志文件不存在");
             return;
         }
 
         copyBlockButton.setEnabled(false);
+        final long offset = anchorOffset;
 
         executor.execute(() -> {
             try {
-                String context =
-                        LogSearchEngine.readContext(
-                                file,
-                                match.byteOffset,
-                                8,
-                                24
-                        );
+                String context = LogSearchEngine.readContext(
+                        file, offset, 8, 24);
 
                 runOnUiThread(() -> {
                     copyBlockButton.setEnabled(true);
-
-                    ClipboardManager clipboard =
-                            (ClipboardManager)
-                                    getSystemService(
-                                            CLIPBOARD_SERVICE
-                                    );
-
-                    clipboard.setPrimaryClip(
-                            ClipData.newPlainText(
-                                    "ShizuLog 日志块",
-                                    context
-                            )
-                    );
-
-                    toast(
-                            "已复制匹配位置附近的日志块"
-                    );
+                    ClipboardManager clipboard = (ClipboardManager)
+                            getSystemService(CLIPBOARD_SERVICE);
+                    clipboard.setPrimaryClip(ClipData.newPlainText(
+                            "ShizuLog 日志块", context));
+                    toast("已复制当前位置附近的日志块");
                 });
             } catch (Exception e) {
                 runOnUiThread(() -> {
                     copyBlockButton.setEnabled(true);
-
-                    toast(
-                            "复制失败："
-                                    + (e.getMessage() == null
-                                    ? e.getClass()
-                                            .getSimpleName()
-                                    : e.getMessage())
-                    );
+                    toast("复制失败：" + safeMessage(e));
                 });
             }
         });
@@ -836,6 +1173,11 @@ public class FullLogActivity
         errorIndexLoaded = false;
         errorMatches.clear();
 
+        ++filterGeneration;
+        filterMatches.clear();
+        currentFilterIndex = -1;
+        updateFilterButtons();
+
         if (wasLast) {
             pageIndex =
                     pageCount - 1;
@@ -924,6 +1266,14 @@ public class FullLogActivity
 
                     rawPageContent =
                             data.content;
+
+                    if (pendingHighlightLine == null) {
+                        setAnchor(
+                                data.startOffset,
+                                data.firstLineNumber,
+                                firstLine(data.content)
+                        );
+                    }
 
                     renderPage(data);
 
@@ -1076,6 +1426,9 @@ public class FullLogActivity
                             )
             );
         }
+
+        pendingHighlightLine = null;
+        pendingHighlightText = null;
     }
 
     private NumberedPage numberLines(
@@ -1415,6 +1768,7 @@ public class FullLogActivity
     @Override
     protected void onDestroy() {
         ++searchGeneration;
+        ++filterGeneration;
         executor.shutdownNow();
         super.onDestroy();
     }
