@@ -7,3 +7,11 @@ app/build/
 .DS_Store
 *.bak
 *.tmp
+
+# ShizuLog signing secrets - NEVER COMMIT
+*.jks
+*.keystore
+*.p12
+signing.properties
+SIGNING-RECOVERY.env
+SIGNING-CERTIFICATE.txt

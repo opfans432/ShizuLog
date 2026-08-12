@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <strong>当前版本：v1.5.1</strong>
+  <strong>当前版本：v1.5.2</strong>
 </p>
 
 ---
@@ -201,7 +201,7 @@ com.google.android.material:material:1.13.0
 
 ## 版本
 
-当前版本：**v1.5.1**
+当前版本：**v1.5.2**
 
 详细更新内容见 [`RELEASE_NOTES.md`](RELEASE_NOTES.md)。
 

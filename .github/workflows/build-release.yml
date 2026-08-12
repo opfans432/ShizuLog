@@ -2,7 +2,8 @@ name: Build and Release APK
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
@@ -11,62 +12,171 @@ permissions:
 jobs:
   build-release:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Set up Java 17
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
       - name: Set up Gradle 8.9
-        uses: gradle/actions/setup-gradle@v6
+        uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
 
-      - name: Set up Android SDK 35
-        uses: android-actions/setup-android@v4
-        with:
-          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
-
-      - name: Build debug APK
-        run: gradle --no-daemon clean :app:assembleDebug
-
-      - name: Prepare APK
+      - name: Install Android SDK 35
         shell: bash
         run: |
+          set -euo pipefail
+          yes | sdkmanager --licenses >/dev/null 2>&1 || true
+          sdkmanager \
+            "platform-tools" \
+            "platforms;android-35" \
+            "build-tools;35.0.0"
+
+      - name: Check signing secrets
+        shell: bash
+        env:
+          KEYSTORE_B64: ${{ secrets.SHIZULOG_KEYSTORE_B64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.SHIZULOG_KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.SHIZULOG_KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.SHIZULOG_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+
+          test -n "$KEYSTORE_B64" || {
+            echo "::error::Missing secret SHIZULOG_KEYSTORE_B64"
+            exit 1
+          }
+
+          test -n "$KEYSTORE_PASSWORD" || {
+            echo "::error::Missing secret SHIZULOG_KEYSTORE_PASSWORD"
+            exit 1
+          }
+
+          test -n "$KEY_PASSWORD" || {
+            echo "::error::Missing secret SHIZULOG_KEY_PASSWORD"
+            exit 1
+          }
+
+          test -n "$KEY_ALIAS" || {
+            echo "::error::Missing secret SHIZULOG_KEY_ALIAS"
+            exit 1
+          }
+
+      - name: Restore fixed signing key
+        shell: bash
+        env:
+          KEYSTORE_B64: ${{ secrets.SHIZULOG_KEYSTORE_B64 }}
+        run: |
+          set -euo pipefail
+          KEYSTORE="$RUNNER_TEMP/ShizuLog-release.jks"
+          printf '%s' "$KEYSTORE_B64" | base64 --decode > "$KEYSTORE"
+          chmod 600 "$KEYSTORE"
+          test -s "$KEYSTORE"
+
+      - name: Build release APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          gradle --no-daemon clean :app:assembleRelease
+
+      - name: Sign release APK with fixed key
+        shell: bash
+        env:
+          SHIZULOG_KEYSTORE_PASSWORD: ${{ secrets.SHIZULOG_KEYSTORE_PASSWORD }}
+          SHIZULOG_KEY_PASSWORD: ${{ secrets.SHIZULOG_KEY_PASSWORD }}
+          SHIZULOG_KEY_ALIAS: ${{ secrets.SHIZULOG_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+
+          TAG="v1.5.2"
+          KEYSTORE="$RUNNER_TEMP/ShizuLog-release.jks"
+          BUILD_TOOLS="$ANDROID_SDK_ROOT/build-tools/35.0.0"
+          ZIPALIGN="$BUILD_TOOLS/zipalign"
+          APKSIGNER="$BUILD_TOOLS/apksigner"
+
+          UNSIGNED="app/build/outputs/apk/release/app-release-unsigned.apk"
+
+          if [ ! -f "$UNSIGNED" ]; then
+            UNSIGNED="$(find app/build/outputs/apk/release \
+              -maxdepth 1 \
+              -type f \
+              -name '*.apk' \
+              | head -n 1 || true)"
+          fi
+
+          test -n "$UNSIGNED" && test -f "$UNSIGNED" || {
+            echo "::error::Release APK not found"
+            find app/build/outputs/apk -type f -maxdepth 5 -print || true
+            exit 1
+          }
+
           mkdir -p dist
-          cp app/build/outputs/apk/debug/app-debug.apk dist/ShizuLog-v1.5.1.apk
-          sha256sum dist/ShizuLog-v1.5.1.apk | tee dist/ShizuLog-v1.5.1.apk.sha256
+
+          ALIGNED="dist/ShizuLog-${TAG}-aligned.apk"
+          FINAL_APK="dist/ShizuLog-${TAG}.apk"
+
+          "$ZIPALIGN" \
+            -p \
+            -f \
+            4 \
+            "$UNSIGNED" \
+            "$ALIGNED"
+
+          "$APKSIGNER" sign \
+            --ks "$KEYSTORE" \
+            --ks-key-alias "$SHIZULOG_KEY_ALIAS" \
+            --ks-pass env:SHIZULOG_KEYSTORE_PASSWORD \
+            --key-pass env:SHIZULOG_KEY_PASSWORD \
+            --out "$FINAL_APK" \
+            "$ALIGNED"
+
+          "$APKSIGNER" verify \
+            --verbose \
+            --print-certs \
+            "$FINAL_APK"
+
+          rm -f "$ALIGNED"
+
+          sha256sum "$FINAL_APK" \
+            | tee "${FINAL_APK}.sha256"
 
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ShizuLog-v1.5.1
+          name: ShizuLog-v1.5.2-signed
           path: |
-            dist/ShizuLog-v1.5.1.apk
-            dist/ShizuLog-v1.5.1.apk.sha256
+            dist/ShizuLog-v1.5.2.apk
+            dist/ShizuLog-v1.5.2.apk.sha256
+          if-no-files-found: error
 
-      - name: Publish v1.5.1
+      - name: Publish v1.5.2
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: v1.5.1
-        shell: bash
         run: |
+          set -euo pipefail
+
+          TAG="v1.5.2"
+          APK="dist/ShizuLog-v1.5.2.apk"
+          SHA="${APK}.sha256"
+
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" \
-              dist/ShizuLog-v1.5.1.apk \
-              dist/ShizuLog-v1.5.1.apk.sha256 \
+              "$APK" \
+              "$SHA" \
               --clobber
           else
             gh release create "$TAG" \
-              dist/ShizuLog-v1.5.1.apk \
-              dist/ShizuLog-v1.5.1.apk.sha256 \
+              "$APK" \
+              "$SHA" \
               --target "$GITHUB_SHA" \
-              --title "ShizuLog v1.5.1" \
+              --title "ShizuLog v1.5.2" \
               --notes-file RELEASE_NOTES.md
           fi
