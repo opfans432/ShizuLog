@@ -1,9 +1,9 @@
 name: Build and Release APK
 
 on:
-  push:
-    branches:
-      - main
+  #push:  # This is not a CI; it should not run and build on every single commit to main
+  #  branches:
+  #    - main
   workflow_dispatch:
 
 permissions:

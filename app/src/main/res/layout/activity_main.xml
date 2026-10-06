@@ -88,7 +88,7 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="8dp"
                             android:clickable="false"
-                            android:text="Shizuku 正在检测…"
+                            android:text="@string/shizuku_checking"
                             android:textColor="@color/status_warning"
                             app:chipBackgroundColor="@color/status_warning_container" />
                     </LinearLayout>
@@ -130,7 +130,7 @@
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
-                            android:text="Shizuku 状态"
+                            android:text="@string/shizuku_status"
                             android:textColor="@color/md_theme_onSurfaceVariant"
                             android:textSize="15sp" />
 
@@ -138,7 +138,7 @@
                             android:id="@+id/permissionState"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="正在检测…"
+                            android:text="@string/detecting"
                             android:textColor="@color/status_warning"
                             android:textSize="15sp"
                             android:textStyle="bold" />
@@ -155,7 +155,7 @@
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
-                            android:text="后端"
+                            android:text="@string/backend"
                             android:textColor="@color/md_theme_onSurfaceVariant"
                             android:textSize="15sp" />
 
@@ -163,7 +163,7 @@
                             android:id="@+id/backendText"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="—"
+                            android:text="@string/unavailable"
                             android:textColor="@color/md_theme_secondary"
                             android:textSize="15sp"
                             android:textStyle="bold" />
@@ -228,7 +228,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="记录范围"
+                        android:text="@string/recording_scope"
                         android:textColor="@color/md_theme_onSurface"
                         android:textSize="20sp"
                         android:textStyle="bold" />
@@ -247,21 +247,21 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:checked="true"
-                            android:text="单应用" />
+                            android:text="@string/single_app" />
 
                         <com.google.android.material.chip.Chip
                             android:id="@+id/captureModeMulti"
                             style="@style/Widget.Material3.Chip.Filter"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="多应用" />
+                            android:text="@string/multi_app" />
 
                         <com.google.android.material.chip.Chip
                             android:id="@+id/captureModeGlobal"
                             style="@style/Widget.Material3.Chip.Filter"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="全局" />
+                            android:text="@string/global" />
                     </com.google.android.material.chip.ChipGroup>
 
                     <LinearLayout
@@ -290,7 +290,7 @@
                                 android:layout_height="wrap_content"
                                 android:layout_marginStart="14dp"
                                 android:layout_weight="1"
-                                android:text="尚未选择目标应用"
+                                android:text="@string/not_selected_target"
                                 android:textColor="@color/md_theme_onSurface"
                                 android:textSize="15sp" />
                         </LinearLayout>
@@ -314,7 +314,7 @@
                             android:layout_gravity="start"
                             android:layout_marginTop="2dp"
                             android:minWidth="0dp"
-                            android:text="▸ 手动输入包名"
+                            android:text="@string/manual_package_collapsed"
                             android:textAllCaps="false" />
 
                         <LinearLayout
@@ -367,7 +367,7 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="10dp"
-                            android:text="尚未选择应用"
+                            android:text="@string/no_app_selected"
                             android:textColor="@color/md_theme_onSurface"
                             android:textSize="15sp" />
 
@@ -375,7 +375,7 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="4dp"
-                            android:text="多应用模式会按所选应用 UID 合并过滤 Logcat。"
+                            android:text="@string/multi_app_mode_desc"
                             android:textColor="@color/md_theme_onSurfaceVariant"
                             android:textSize="12sp" />
 
@@ -385,7 +385,7 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="12dp"
                             android:minHeight="50dp"
-                            android:text="选择多个应用"
+                            android:text="@string/choose_multiple_apps"
                             android:textAllCaps="false"
                             app:backgroundTint="@color/md_theme_secondary"
                             app:cornerRadius="16dp" />
@@ -404,7 +404,7 @@
                         <TextView
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:text="全局 Logcat"
+                            android:text="@string/global_logcat"
                             android:textColor="@color/status_warning"
                             android:textSize="15sp"
                             android:textStyle="bold" />
@@ -413,7 +413,7 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="4dp"
-                            android:text="记录 Shizuku 当前权限可读取的 main / system / crash / events 日志，不按 App UID 过滤。日志量可能非常大，也可能包含其他应用或系统的敏感信息；单卷达到 50 MB 后会自动分卷。"
+                            android:text="@string/global_logcat_desc"
                             android:textColor="@color/md_theme_onSurface"
                             android:textSize="13sp" />
                     </LinearLayout>
@@ -457,7 +457,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:clickable="false"
-                            android:text="已停止"
+                            android:text="@string/stopped"
                             android:textColor="@color/md_theme_onSurfaceVariant"
                             app:chipBackgroundColor="@color/md_theme_surfaceContainer" />
                     </LinearLayout>
@@ -571,7 +571,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="12dp"
-                        android:text="等待开始记录"
+                        android:text="@string/waiting_to_start"
                         android:textColor="@color/md_theme_onSurface"
                         android:textSize="15sp" />
 
@@ -582,7 +582,7 @@
                         android:layout_marginTop="8dp"
                         android:ellipsize="middle"
                         android:maxLines="2"
-                        android:text="日志路径：—"
+                        android:text="@string/log_path_empty"
                         android:textColor="@color/md_theme_onSurfaceVariant"
                         android:textIsSelectable="true"
                         android:textSize="13sp" />
@@ -592,7 +592,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="3dp"
-                        android:text="日志大小：0 B"
+                        android:text="@string/log_size_empty"
                         android:textColor="@color/md_theme_onSurfaceVariant"
                         android:textSize="13sp" />
 
@@ -601,7 +601,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="3dp"
-                        android:text="统计：—"
+                        android:text="@string/stats_empty"
                         android:textColor="@color/md_theme_onSurfaceVariant"
                         android:textSize="12sp" />
 
@@ -625,7 +625,7 @@
                             <TextView
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="实时分析 · 最近 60 秒"
+                                android:text="@string/real_time_analysis"
                                 android:textColor="@color/md_theme_onSurface"
                                 android:textSize="14sp"
                                 android:textStyle="bold" />
@@ -635,7 +635,7 @@
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="5dp"
-                                android:text="60 秒窗口：等待日志…"
+                                android:text="@string/realtime_waiting"
                                 android:textColor="@color/md_theme_onSurfaceVariant"
                                 android:textSize="12sp" />
 
@@ -644,7 +644,7 @@
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="3dp"
-                                android:text="Top Tag：—"
+                                android:text="@string/top_tag_empty"
                                 android:textColor="@color/md_theme_onSurfaceVariant"
                                 android:textSize="12sp" />
 
@@ -653,7 +653,7 @@
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="3dp"
-                                android:text="PID：0 · 进程变化 0 · 最近：—"
+                                android:text="@string/pid_stats_empty"
                                 android:textColor="@color/md_theme_onSurfaceVariant"
                                 android:textSize="12sp" />
                         </LinearLayout>
@@ -671,7 +671,7 @@
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
-                            android:text="完整日志"
+                            android:text="@string/view_full_log"
                             android:textAllCaps="false" />
 
                         <com.google.android.material.button.MaterialButton
@@ -681,7 +681,7 @@
                             android:layout_height="wrap_content"
                             android:layout_marginStart="6dp"
                             android:layout_weight="1"
-                            android:text="崩溃分析"
+                            android:text="@string/crash_analysis_title"
                             android:textAllCaps="false" />
 
                         <com.google.android.material.button.MaterialButton
@@ -691,7 +691,7 @@
                             android:layout_height="wrap_content"
                             android:layout_marginStart="6dp"
                             android:layout_weight="1"
-                            android:text="诊断包"
+                            android:text="@string/diagnostic_pack_title"
                             android:textAllCaps="false" />
 
                         <com.google.android.material.button.MaterialButton
@@ -701,7 +701,7 @@
                             android:layout_height="wrap_content"
                             android:layout_marginStart="6dp"
                             android:layout_weight="1"
-                            android:text="历史日志"
+                            android:text="@string/history_logs"
                             android:textAllCaps="false" />
                     </LinearLayout>
 
@@ -709,7 +709,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="12dp"
-                        android:hint="搜索当前日志"
+                        android:hint="@string/search_current_log"
                         app:boxBackgroundMode="outline"
                         app:boxCornerRadiusBottomEnd="16dp"
                         app:boxCornerRadiusBottomStart="16dp"
@@ -742,35 +742,35 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:checked="true"
-                            android:text="全部" />
+                            android:text="@string/log_all" />
 
                         <com.google.android.material.chip.Chip
                             android:id="@+id/logFilterDebug"
                             style="@style/Widget.Material3.Chip.Filter"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="D+" />
+                            android:text="@string/log_debug_plus" />
 
                         <com.google.android.material.chip.Chip
                             android:id="@+id/logFilterInfo"
                             style="@style/Widget.Material3.Chip.Filter"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="I+" />
+                            android:text="@string/log_info_plus" />
 
                         <com.google.android.material.chip.Chip
                             android:id="@+id/logFilterWarn"
                             style="@style/Widget.Material3.Chip.Filter"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="W+" />
+                            android:text="@string/log_warn_plus" />
 
                         <com.google.android.material.chip.Chip
                             android:id="@+id/logFilterError"
                             style="@style/Widget.Material3.Chip.Filter"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="E+" />
+                            android:text="@string/log_error_plus" />
                     </com.google.android.material.chip.ChipGroup>
 
 
@@ -784,7 +784,7 @@
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
-                            android:hint="Tag">
+                            android:hint="@string/tag_hint">
 
                             <com.google.android.material.textfield.TextInputEditText
                                 android:id="@+id/realtimeTagInput"
@@ -798,7 +798,7 @@
                             android:layout_width="98dp"
                             android:layout_height="wrap_content"
                             android:layout_marginStart="6dp"
-                            android:hint="PID">
+                            android:hint="@string/pid_hint">
 
                             <com.google.android.material.textfield.TextInputEditText
                                 android:id="@+id/realtimePidInput"
@@ -814,7 +814,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
-                        android:hint="进程 / 包名关键字（仅过滤实时预览）">
+                        android:hint="@string/realtime_process_hint">
 
                         <com.google.android.material.textfield.TextInputEditText
                             android:id="@+id/realtimeProcessInput"
@@ -829,7 +829,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="2dp"
-                        android:text="显示全部日志"
+                        android:text="@string/show_all_logs"
                         android:textColor="@color/md_theme_onSurfaceVariant"
                         android:textSize="12sp" />
 
@@ -851,7 +851,7 @@
                                 android:layout_width="40dp"
                                 android:layout_height="40dp"
                                 android:alpha="0.72"
-                                android:contentDescription="暂无日志"
+                                android:contentDescription="@string/no_logs"
                                 android:src="@drawable/ic_description_40" />
 
                             <TextView
@@ -859,7 +859,7 @@
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="10dp"
-                                android:text="暂无日志"
+                                android:text="@string/no_logs"
                                 android:textColor="@color/log_text"
                                 android:textSize="16sp"
                                 android:textStyle="bold" />
@@ -870,7 +870,7 @@
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="5dp"
                                 android:gravity="center"
-                                android:text="开始记录后，目标应用的日志会显示在这里"
+                                android:text="@string/no_logs_desc"
                                 android:textColor="@color/md_theme_outlineVariant"
                                 android:textSize="12sp" />
                         </LinearLayout>

@@ -22,7 +22,7 @@ public final class LogFilterPresetStore {
                 JSONObject object = array.optJSONObject(i);
                 if (object == null) continue;
                 out.add(new Preset(
-                        object.optString("name", "未命名"),
+                        object.optString("name", context.getString(R.string.unnamed_preset)),
                         new LogFilterEngine.Spec(
                                 object.optInt("minLevel", 0),
                                 object.optString("tag", ""),

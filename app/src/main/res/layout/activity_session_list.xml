@@ -13,7 +13,7 @@
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
         android:background="@color/md_theme_background"
-        app:title="记录会话"
+        app:title="@string/sessions_title"
         app:titleTextColor="@color/md_theme_onBackground" />
 
     <TextView
@@ -22,7 +22,7 @@
         android:layout_height="wrap_content"
         android:paddingHorizontal="16dp"
         android:paddingBottom="8dp"
-        android:text="0 个记录会话"
+        android:text="@string/session_count_zero"
         android:textColor="@color/md_theme_onSurfaceVariant"
         android:textSize="13sp" />
 
@@ -46,7 +46,7 @@
                 android:layout_height="wrap_content"
                 android:gravity="center"
                 android:padding="32dp"
-                android:text="还没有会话。\n从首页进入“实时日志”开始记录。"
+                android:text="@string/no_sessions"
                 android:textColor="@color/md_theme_onSurfaceVariant"
                 android:textSize="14sp" />
         </LinearLayout>

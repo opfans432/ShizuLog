@@ -218,7 +218,7 @@ public class LogCaptureService extends Service {
                     )
                     .apply();
 
-            stopCapture("已停止");
+            stopCapture(getString(R.string.status_stop_marker));
             stopSelf();
 
             return START_NOT_STICKY;
@@ -305,7 +305,7 @@ public class LogCaptureService extends Service {
                 && uids.length == 0) {
 
             sendStatus(
-                    "目标信息无效",
+                    getString(R.string.target_info_invalid),
                     null
             );
 
@@ -471,8 +471,7 @@ public class LogCaptureService extends Service {
                 if (!dir.exists()
                         && !dir.mkdirs()) {
                     throw new IllegalStateException(
-                            "无法创建日志目录: "
-                                    + dir
+                            getString(R.string.log_dir_creation_failed, dir)
                     );
                 }
 
@@ -518,10 +517,8 @@ public class LogCaptureService extends Service {
 
                 sendStatus(
                         mode == MODE_GLOBAL
-                                ? "已通过 Shizuku 开始全局 Logcat 记录；单卷 50 MB 自动分卷"
-                                : "已通过 Shizuku 开始记录 "
-                                        + display
-                                        + "；已启用动态 PID / 多进程追踪",
+                                ? getString(R.string.recording_global_started)
+                                : getString(R.string.recording_started, display),
                         currentFile
                 );
 
@@ -694,9 +691,7 @@ public class LogCaptureService extends Service {
                                         .apply();
 
                                 sendStatus(
-                                        "全局日志已自动分卷：第 "
-                                                + nextPart
-                                                + " 卷",
+                                        getString(R.string.global_split_status, nextPart),
                                         currentFile
                                 );
                             }
@@ -766,7 +761,7 @@ public class LogCaptureService extends Service {
                             && rawLineCount > 0) {
 
                         sendStatus(
-                                "Logcat 正在工作，但当前没有匹配到目标日志。ShizuLog 已同时使用 UID、动态 PID、多进程名和包名上下文过滤；如果仍为空，通常表示目标 App 本身几乎没有向 Logcat 写消息。",
+                                getString(R.string.logcat_no_matching),
                                 currentFile
                         );
                     }
@@ -805,19 +800,13 @@ public class LogCaptureService extends Service {
                             logcatProcess.waitFor();
 
                     sendStatus(
-                            "Shizuku logcat 已退出，退出码="
-                                    + exit
-                                    + "。若 Shizuku 被停止/重启，请重新授权后再开始。",
+                            getString(R.string.logcat_exited, exit),
                             currentFile
                     );
                 }
             } catch (Throwable e) {
                 sendStatus(
-                        "记录失败: "
-                                + e.getClass()
-                                        .getSimpleName()
-                                + ": "
-                                + safeMessage(e),
+                        getString(R.string.record_failed, e.getClass().getSimpleName(), safeMessage(e)),
                         currentFile
                 );
             } finally {
@@ -1017,13 +1006,13 @@ public class LogCaptureService extends Service {
     private void ensureShizukuReady() {
         if (!Shizuku.pingBinder()) {
             throw new IllegalStateException(
-                    "Shizuku 未运行或 Binder 未连接"
+                    getString(R.string.shizuku_binder_unavailable)
             );
         }
 
         if (Shizuku.isPreV11()) {
             throw new IllegalStateException(
-                    "Shizuku 版本过旧，需要 API 11+"
+                    getString(R.string.shizuku_api_old)
             );
         }
 
@@ -1032,7 +1021,7 @@ public class LogCaptureService extends Service {
                         .PERMISSION_GRANTED) {
 
             throw new SecurityException(
-                    "尚未授予 Shizuku 权限"
+                    getString(R.string.shizuku_permission_missing)
             );
         }
     }
@@ -1730,7 +1719,7 @@ public class LogCaptureService extends Service {
                 }
 
                 sendStatus(
-                        "已补抓崩溃快照并追加到当前日志",
+                        getString(R.string.snapshot_captured),
                         targetFile
                 );
             } catch (Throwable ignored) {}
@@ -1907,10 +1896,10 @@ public class LogCaptureService extends Service {
                                 .ic_menu_info_details
                 )
                 .setContentTitle(
-                        "正在记录: " + label
+                        getString(R.string.notification_recording_title, label)
                 )
                 .setContentText(
-                        "Shizuku 日志采集中，点击返回"
+                        getString(R.string.notification_recording_text)
                 )
                 .setOngoing(true)
                 .setContentIntent(content)
@@ -1918,20 +1907,20 @@ public class LogCaptureService extends Service {
                         new Notification.Action.Builder(
                                 android.R.drawable
                                         .ic_media_pause,
-                                "停止",
+                                getString(R.string.notification_stop),
                                 stopPi
                         ).build()
                 )
                 .build();
     }
 
-    private static String buildDisplayLabel(
+    private String buildDisplayLabel(
             int mode,
             String[] packages,
             String[] labels
     ) {
         if (mode == MODE_GLOBAL) {
-            return "全局 Logcat";
+            return getString(R.string.global_logcat_mode);
         }
 
         if (mode == MODE_MULTI) {
@@ -1940,7 +1929,7 @@ public class LogCaptureService extends Service {
                             ? 0
                             : packages.length;
 
-            return count + " 个应用";
+            return getString(R.string.multi_apps_mode_count, count);
         }
 
         if (labels != null
@@ -1955,7 +1944,7 @@ public class LogCaptureService extends Service {
             return packages[0];
         }
 
-        return "目标应用";
+        return getString(R.string.target_recorded);
     }
 
     private void createChannel() {
@@ -1973,7 +1962,7 @@ public class LogCaptureService extends Service {
                     );
 
             c.setDescription(
-                    "保持 Shizuku 日志采集任务运行"
+                    getString(R.string.notification_channel_desc)
             );
 
             getSystemService(
@@ -2167,11 +2156,11 @@ public class LogCaptureService extends Service {
         );
     }
 
-    private static String safeMessage(Throwable e) {
+    private String safeMessage(Throwable e) {
         String m = e.getMessage();
 
         return m == null
-                ? "无详细信息"
+                ? getString(R.string.no_details)
                 : m;
     }
 

@@ -325,7 +325,7 @@ public class FullLogActivity
         if (!isSafeLogPath(path)) {
             Toast.makeText(
                     this,
-                    "日志文件无效",
+                    getString(R.string.invalid_log_file),
                     Toast.LENGTH_SHORT
             ).show();
 
@@ -469,13 +469,13 @@ public class FullLogActivity
     private void runWholeFileFilter() {
         LogFilterEngine.Spec spec = currentFilterSpec();
         final long generation = ++filterGeneration;
-        filterStatus.setText("正在筛选整份日志…");
+        filterStatus.setText(getString(R.string.filtering_full_file));
         filterApplyButton.setEnabled(false);
 
         executor.execute(() -> {
             LogFilterEngine.Result result;
             try {
-                result = LogFilterEngine.filter(file, spec);
+                result = LogFilterEngine.filter(FullLogActivity.this, file, spec);
             } catch (Exception e) {
                 result = LogFilterEngine.Result.error(safeMessage(e));
             }
@@ -495,13 +495,20 @@ public class FullLogActivity
 
                 filterMatches.addAll(finalResult.matches);
                 if (filterMatches.isEmpty()) {
-                    filterStatus.setText("筛选结果：0 条");
+                    filterStatus.setText(getString(R.string.filter_result_zero));
                     updateFilterButtons();
                     return;
                 }
 
-                filterStatus.setText("筛选结果：" + filterMatches.size() + " 条"
-                        + (finalResult.truncated ? "（达到 5000 条索引上限）" : ""));
+                filterStatus.setText(
+                        getString(
+                                R.string.filter_result_count,
+                                filterMatches.size(),
+                                finalResult.truncated
+                                        ? getString(R.string.filter_result_truncated)
+                                        : ""
+                        )
+                );
                 currentFilterIndex = 0;
                 jumpToFilterMatch(filterMatches.get(0));
                 updateFilterButtons();
@@ -516,7 +523,7 @@ public class FullLogActivity
             try {
                 pid = Integer.parseInt(pidText);
             } catch (NumberFormatException ignored) {
-                toast("PID 必须是数字");
+                toast(getString(R.string.pid_must_be_number));
             }
         }
 
@@ -557,15 +564,21 @@ public class FullLogActivity
 
     private void jumpRelativeFilter(int delta) {
         if (filterMatches.isEmpty()) {
-            toast("请先应用筛选");
+            toast(getString(R.string.apply_filter_first));
             return;
         }
         int size = filterMatches.size();
         if (currentFilterIndex < 0) currentFilterIndex = 0;
         else currentFilterIndex = (currentFilterIndex + delta + size) % size;
         LogFilterEngine.Match match = filterMatches.get(currentFilterIndex);
-        filterStatus.setText("筛选 " + (currentFilterIndex + 1) + " / " + size
-                + " · 行 " + match.lineNumber);
+        filterStatus.setText(
+                getString(
+                        R.string.filter_position,
+                        currentFilterIndex + 1,
+                        size,
+                        match.lineNumber
+                )
+        );
         jumpToFilterMatch(match);
     }
 
@@ -589,7 +602,7 @@ public class FullLogActivity
         filterMatches.clear();
         currentFilterIndex = -1;
         applyFilterSpec(LogFilterEngine.Spec.all());
-        filterStatus.setText("未应用过滤");
+        filterStatus.setText(getString(R.string.no_filter_applied));
         updateFilterButtons();
     }
 
@@ -597,13 +610,13 @@ public class FullLogActivity
         List<String> names = new ArrayList<>();
         List<LogFilterEngine.Spec> specs = new ArrayList<>();
 
-        names.add("全部日志");
+        names.add(getString(R.string.preset_all_logs));
         specs.add(LogFilterEngine.Spec.all());
-        names.add("警告及以上");
+        names.add(getString(R.string.preset_warn_plus));
         specs.add(new LogFilterEngine.Spec(4, "", 0, "", "", false));
-        names.add("错误及以上");
+        names.add(getString(R.string.preset_error_plus));
         specs.add(new LogFilterEngine.Spec(5, "", 0, "", "", false));
-        names.add("崩溃标记");
+        names.add(getString(R.string.preset_crash_markers));
         specs.add(new LogFilterEngine.Spec(0, "", 0, "", "", true));
 
         android.content.SharedPreferences statePrefs =
@@ -613,47 +626,47 @@ public class FullLogActivity
             targetPackage = statePrefs.getString("selected_package", "");
         }
         if (targetPackage != null && !targetPackage.trim().isEmpty()) {
-            names.add("当前目标包：" + targetPackage);
+            names.add(getString(R.string.preset_current_target, targetPackage));
             specs.add(new LogFilterEngine.Spec(0, "", 0, targetPackage, "", false));
         }
 
         List<LogFilterPresetStore.Preset> custom = LogFilterPresetStore.load(this);
         for (LogFilterPresetStore.Preset item : custom) {
-            names.add("自定义 · " + item.name);
+            names.add(getString(R.string.preset_custom, item.name));
             specs.add(item.spec);
         }
 
         new MaterialAlertDialogBuilder(this)
-                .setTitle("过滤预设")
+                .setTitle(getString(R.string.filter_preset_title))
                 .setItems(names.toArray(new String[0]), (dialog, which) -> {
                     applyFilterSpec(specs.get(which));
-                    filterStatus.setText("已载入：" + names.get(which));
+                    filterStatus.setText(getString(R.string.loaded_preset, names.get(which)));
                 })
-                .setNegativeButton("关闭", null)
+                .setNegativeButton(getString(R.string.close), null)
                 .show();
     }
 
     private void showSavePresetDialog() {
         EditText input = new EditText(this);
-        input.setHint("例如：HOH4 网络错误");
+        input.setHint(getString(R.string.preset_name_hint));
         input.setSingleLine(true);
         int pad = (int) (20 * getResources().getDisplayMetrics().density);
         input.setPadding(pad, pad / 2, pad, pad / 2);
 
         new MaterialAlertDialogBuilder(this)
-                .setTitle("保存过滤预设")
+                .setTitle(getString(R.string.save_preset_title))
                 .setView(input)
-                .setPositiveButton("保存", (dialog, which) -> {
+                .setPositiveButton(getString(R.string.save), (dialog, which) -> {
                     String name = input.getText().toString().trim();
                     if (name.isEmpty()) {
-                        toast("预设名称不能为空");
+                        toast(getString(R.string.preset_name_required));
                         return;
                     }
                     LogFilterPresetStore.saveOrReplace(
                             this, new LogFilterPresetStore.Preset(name, currentFilterSpec()));
-                    toast("过滤预设已保存");
+                    toast(getString(R.string.preset_saved));
                 })
-                .setNegativeButton("取消", null)
+                .setNegativeButton(getString(R.string.cancel), null)
                 .show();
     }
 
@@ -664,20 +677,28 @@ public class FullLogActivity
         LogBookmarkStore.Bookmark bookmark = new LogBookmarkStore.Bookmark(
                 anchorOffset, anchorLine, cleanPreview(anchorPreview), System.currentTimeMillis());
         boolean added = LogBookmarkStore.add(this, file, bookmark);
-        toast(added ? "已收藏第 " + anchorLine + " 行" : "这一行已经收藏");
+        toast(
+                added
+                        ? getString(R.string.bookmark_added, anchorLine)
+                        : getString(R.string.bookmark_already_saved)
+        );
         updateBookmarkButtons();
     }
 
     private void removeCurrentBookmark() {
         boolean removed = LogBookmarkStore.removeLine(this, file, anchorLine);
-        toast(removed ? "已取消收藏" : "当前位置没有书签");
+        toast(
+                removed
+                        ? getString(R.string.bookmark_removed)
+                        : getString(R.string.bookmark_none_here)
+        );
         updateBookmarkButtons();
     }
 
     private void showBookmarks() {
         List<LogBookmarkStore.Bookmark> bookmarks = LogBookmarkStore.load(this, file);
         if (bookmarks.isEmpty()) {
-            toast("当前日志还没有书签");
+            toast(getString(R.string.no_bookmarks));
             return;
         }
 
@@ -688,7 +709,7 @@ public class FullLogActivity
         }
 
         new MaterialAlertDialogBuilder(this)
-                .setTitle("日志书签 · " + bookmarks.size())
+                .setTitle(getString(R.string.bookmarks_title, bookmarks.size()))
                 .setItems(labels, (dialog, which) -> {
                     LogBookmarkStore.Bookmark item = bookmarks.get(which);
                     setAnchor(item.byteOffset, item.lineNumber, item.preview);
@@ -697,19 +718,19 @@ public class FullLogActivity
                     loadPage((int) Math.min(Integer.MAX_VALUE, item.byteOffset / PAGE_BYTES));
                     updateBookmarkButtons();
                 })
-                .setNeutralButton("清空全部", (dialog, which) -> {
+                .setNeutralButton(getString(R.string.clear_all), (dialog, which) -> {
                     LogBookmarkStore.clear(this, file);
                     updateBookmarkButtons();
-                    toast("已清空当前日志书签");
+                    toast(getString(R.string.bookmarks_cleared));
                 })
-                .setNegativeButton("关闭", null)
+                .setNegativeButton(getString(R.string.close), null)
                 .show();
     }
 
     private void updateBookmarkButtons() {
         if (file == null || bookmarkListButton == null) return;
         List<LogBookmarkStore.Bookmark> bookmarks = LogBookmarkStore.load(this, file);
-        bookmarkListButton.setText("书签 " + bookmarks.size());
+        bookmarkListButton.setText(getString(R.string.bookmark_count, bookmarks.size()));
         boolean saved = false;
         for (LogBookmarkStore.Bookmark item : bookmarks) {
             if (item.lineNumber == anchorLine) {
@@ -748,8 +769,8 @@ public class FullLogActivity
         if (input != null) input.setText(value == null ? "" : value);
     }
 
-    private static String safeMessage(Throwable error) {
-        if (error == null) return "未知错误";
+    private String safeMessage(Throwable error) {
+        if (error == null) return getString(R.string.unknown_error);
         String message = error.getMessage();
         return message == null ? error.getClass().getSimpleName() : message;
     }
@@ -763,7 +784,7 @@ public class FullLogActivity
                                 .toString();
 
         if (query.trim().isEmpty()) {
-            toast("请输入搜索内容");
+            toast(getString(R.string.search_input_required));
             return;
         }
 
@@ -771,7 +792,7 @@ public class FullLogActivity
                 ++searchGeneration;
 
         searchStatus.setText(
-                "正在搜索整份日志…"
+                getString(R.string.searching_full_file)
         );
 
         searchButton.setEnabled(false);
@@ -782,6 +803,7 @@ public class FullLogActivity
             try {
                 result =
                         LogSearchEngine.search(
+                                FullLogActivity.this,
                                 file,
                                 query,
                                 regexCheck.isChecked()
@@ -828,7 +850,7 @@ public class FullLogActivity
 
                 if (searchMatches.isEmpty()) {
                     searchStatus.setText(
-                            "未找到匹配项"
+                            getString(R.string.no_matches)
                     );
 
                     updateSearchButtons();
@@ -836,10 +858,11 @@ public class FullLogActivity
                 }
 
                 searchStatus.setText(
-                        searchMatches.size()
-                                + " 个匹配"
-                                + (finalResult.truncated
-                                ? "（已达到 5000 条上限）"
+                        getString(
+                                R.string.search_matches,
+                                searchMatches.size()
+                        ) + (finalResult.truncated
+                                ? getString(R.string.search_matches_truncated)
                                 : "")
                 );
 
@@ -856,7 +879,7 @@ public class FullLogActivity
             int delta
     ) {
         if (searchMatches.isEmpty()) {
-            toast("请先搜索");
+            toast(getString(R.string.search_first));
             return;
         }
 
@@ -879,12 +902,12 @@ public class FullLogActivity
                 );
 
         searchStatus.setText(
-                "第 "
-                        + (currentMatchIndex + 1)
-                        + " / "
-                        + size
-                        + " 个匹配 · 行 "
-                        + match.lineNumber
+                getString(
+                        R.string.search_position,
+                        currentMatchIndex + 1,
+                        size,
+                        match.lineNumber
+                )
         );
 
         jumpToMatch(match);
@@ -899,7 +922,7 @@ public class FullLogActivity
 
         errorButton.setEnabled(false);
         searchStatus.setText(
-                "正在建立 ERROR 索引…"
+                getString(R.string.building_error_index)
         );
 
         executor.execute(() -> {
@@ -908,6 +931,7 @@ public class FullLogActivity
             try {
                 result =
                         LogSearchEngine.findErrors(
+                                FullLogActivity.this,
                                 file
                         );
             } catch (Exception e) {
@@ -943,7 +967,7 @@ public class FullLogActivity
 
                 if (errorMatches.isEmpty()) {
                     searchStatus.setText(
-                            "未检测到 ERROR / 崩溃标记"
+                            getString(R.string.no_error_markers)
                     );
                     return;
                 }
@@ -955,7 +979,7 @@ public class FullLogActivity
 
     private void jumpToNextErrorFromCurrentPage() {
         if (errorMatches.isEmpty()) {
-            toast("没有检测到 ERROR");
+            toast(getString(R.string.no_error));
             return;
         }
 
@@ -979,8 +1003,7 @@ public class FullLogActivity
         }
 
         searchStatus.setText(
-                "ERROR · 行 "
-                        + target.lineNumber
+                getString(R.string.error_line, target.lineNumber)
         );
 
         jumpToMatch(target);
@@ -1018,7 +1041,7 @@ public class FullLogActivity
 
     private void copyCurrentMatchContext() {
         if (file == null || !file.isFile()) {
-            toast("日志文件不存在");
+            toast(getString(R.string.log_file_not_found));
             return;
         }
 
@@ -1035,13 +1058,13 @@ public class FullLogActivity
                     ClipboardManager clipboard = (ClipboardManager)
                             getSystemService(CLIPBOARD_SERVICE);
                     clipboard.setPrimaryClip(ClipData.newPlainText(
-                            "ShizuLog 日志块", context));
-                    toast("已复制当前位置附近的日志块");
+                            getString(R.string.log_block_clipboard), context));
+                    toast(getString(R.string.copied_log_block));
                 });
             } catch (Exception e) {
                 runOnUiThread(() -> {
                     copyBlockButton.setEnabled(true);
-                    toast("复制失败：" + safeMessage(e));
+                    toast(getString(R.string.copy_failed, safeMessage(e)));
                 });
             }
         });
@@ -1110,8 +1133,8 @@ public class FullLogActivity
     private void applyWrapMode() {
         wrapButton.setText(
                 wrapLines
-                        ? "自动换行：开"
-                        : "自动换行：关"
+                        ? getString(R.string.wrap_on)
+                        : getString(R.string.wrap_off)
         );
 
         horizontalScroll.setFillViewport(
@@ -1192,7 +1215,7 @@ public class FullLogActivity
         loadPage(pageIndex);
 
         if (pageCount > oldCount) {
-            toast("发现新的日志页");
+            toast(getString(R.string.new_log_page));
         }
     }
 
@@ -1237,9 +1260,7 @@ public class FullLogActivity
                 pageIndex;
 
         pageText.setText(
-                "正在读取第 "
-                        + (requested + 1)
-                        + " 页…"
+                getString(R.string.reading_page, requested + 1)
         );
 
         executor.execute(() -> {
@@ -1280,15 +1301,13 @@ public class FullLogActivity
                     updateMeta();
 
                     pageIndicator.setText(
-                            "第 "
-                                    + (pageIndex + 1)
-                                    + " / "
-                                    + pageCount
-                                    + " 页"
-                                    + " · 行 "
-                                    + data.firstLineNumber
-                                    + "–"
-                                    + data.lastLineNumber
+                            getString(
+                            R.string.page_status,
+                            pageIndex + 1,
+                            pageCount,
+                            data.firstLineNumber,
+                            data.lastLineNumber
+                    )
                     );
 
                     firstButton.setEnabled(
@@ -1312,12 +1331,12 @@ public class FullLogActivity
             } catch (Exception e) {
                 runOnUiThread(
                         () -> pageText.setText(
-                                "读取失败："
-                                        + (e.getMessage()
-                                                == null
-                                        ? e.getClass()
-                                                .getSimpleName()
-                                        : e.getMessage())
+                                getString(
+                                        R.string.read_failed,
+                                        e.getMessage() == null
+                                                ? e.getClass().getSimpleName()
+                                                : e.getMessage()
+                                )
                         )
                 );
             }
@@ -1497,19 +1516,13 @@ public class FullLogActivity
                 isCurrentRecordingFile();
 
         fileMeta.setText(
-                "文件大小："
-                        + humanSize(
-                                file.length()
-                        )
-                        + " · 每页约 256 KB"
-                        + " · 字号 "
-                        + (int) textSizeSp
-                        + "sp"
-                        + " · 更新 "
-                        + date
-                        + (active
-                        ? " · ● 正在写入"
-                        : "")
+                getString(
+                R.string.file_size_meta,
+                humanSize(file.length()),
+                (int) textSizeSp,
+                date,
+                active ? getString(R.string.writing_marker) : ""
+        )
         );
     }
 

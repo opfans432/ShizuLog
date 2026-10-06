@@ -154,7 +154,7 @@ public class CrashAnalysisActivity
                         );
 
         if (!isSafeLogPath(path)) {
-            toast("日志文件无效");
+            toast(getString(R.string.invalid_log_file));
             finish();
             return;
         }
@@ -162,7 +162,7 @@ public class CrashAnalysisActivity
         file = new File(path);
 
         toolbar.setTitle(
-                "崩溃分析"
+                getString(R.string.crash_analysis_title)
         );
 
         updateFileMeta();
@@ -193,12 +193,12 @@ public class CrashAnalysisActivity
         );
 
         stateText.setText(
-                "正在分析最近的崩溃上下文…"
+                getString(R.string.crash_context_analyzing)
         );
 
         executor.execute(() -> {
             CrashAnalyzer.Result parsed =
-                    CrashAnalyzer.analyze(file);
+                    CrashAnalyzer.analyze(this, file);
 
             runOnUiThread(() -> {
                 if (isFinishing()
@@ -218,8 +218,8 @@ public class CrashAnalysisActivity
 
                 stateText.setText(
                         parsed.detected
-                                ? "已检测到崩溃"
-                                : "未检测到明显崩溃"
+                                ? getString(R.string.crash_detected)
+                                : getString(R.string.no_obvious_crash)
                 );
 
                 renderResult(parsed);
@@ -268,8 +268,8 @@ public class CrashAnalysisActivity
 
             stackText.setText(
                     parsed.detected
-                            ? "没有提取到可显示的堆栈片段，请打开完整日志。"
-                            : "当前日志中没有识别到 FATAL EXCEPTION、ANR 或常见 Native 崩溃标记。"
+                            ? getString(R.string.crash_stack_missing)
+                            : getString(R.string.crash_no_markers)
             );
         } else {
             stackText.setText(
@@ -321,18 +321,18 @@ public class CrashAnalysisActivity
 
         clipboard.setPrimaryClip(
                 ClipData.newPlainText(
-                        "ShizuLog 崩溃摘要",
+                        getString(R.string.crash_summary_clipboard),
                         result.summary
                 )
         );
 
-        toast("崩溃摘要已复制");
+        toast(getString(R.string.crash_summary_copied));
     }
 
     private void openFullLog() {
         if (file == null
                 || !file.isFile()) {
-            toast("日志文件不存在");
+            toast(getString(R.string.log_file_not_found));
             return;
         }
 

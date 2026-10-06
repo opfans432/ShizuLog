@@ -103,8 +103,7 @@ public class SessionListActivity
                                 .list(this);
 
         summary.setText(
-                sessions.size()
-                        + " 个记录会话"
+                getString(R.string.session_count, sessions.size())
         );
 
         empty.setVisibility(
@@ -187,7 +186,9 @@ public class SessionListActivity
                     );
 
             title.setText(
-                    session.name
+                    session.name.isEmpty()
+                            ? getString(R.string.unnamed_session)
+                            : session.name
             );
 
             title.setTextSize(17);
@@ -211,13 +212,10 @@ public class SessionListActivity
 
             state.setText(
                     (session.active
-                            ? "● 正在记录"
-                            : "已结束")
+                            ? getString(R.string.recording_indicator)
+                            : getString(R.string.session_ended))
                             + " · "
-                            + CaptureSessionManager
-                            .modeName(
-                                    session.mode
-                            )
+                            + CaptureSessionManager.modeName(this, session.mode)
             );
 
             state.setTextColor(
@@ -293,19 +291,19 @@ public class SessionListActivity
         }
     }
 
-    private static String targetSummary(
+    private String targetSummary(
             CaptureSessionManager.Session session
     ) {
         if (session.mode
                 == LogCaptureService
                 .MODE_GLOBAL) {
-            return "全局 Logcat";
+            return getString(R.string.global_logcat_mode);
         }
 
         if (session.labels.length == 0) {
             return session.packages.length > 0
                     ? session.packages[0]
-                    : "未记录目标";
+                    : getString(R.string.unselected_target);
         }
 
         if (session.labels.length == 1) {
@@ -316,17 +314,14 @@ public class SessionListActivity
                     : "");
         }
 
-        return session.labels[0]
-                + " 等 "
-                + session.labels.length
-                + " 个应用";
+        return getString(R.string.multi_apps_mode_many, session.labels[0], session.labels.length);
     }
 
-    private static String formatTime(
+    private String formatTime(
             long time
     ) {
         if (time <= 0L) {
-            return "未知时间";
+            return getString(R.string.unknown_time);
         }
 
         return new SimpleDateFormat(

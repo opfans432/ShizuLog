@@ -169,20 +169,22 @@ public class SessionDetailActivity
 
         if (session == null) {
             toast(
-                    "会话不存在"
+                    getString(R.string.session_not_found)
             );
             finish();
             return;
         }
 
         title.setText(
-                session.name
+                session.name.isEmpty()
+                        ? getString(R.string.unnamed_session)
+                        : session.name
         );
 
         state.setText(
                 session.active
-                        ? "● 正在记录"
-                        : "记录已结束"
+                        ? getString(R.string.recording_indicator)
+                        : getString(R.string.status_ended)
         );
 
         state.setTextColor(
@@ -274,7 +276,7 @@ public class SessionDetailActivity
         if (session == null
                 || !session.hasLog()) {
             toast(
-                    "这个会话没有可用日志文件"
+                    getString(R.string.session_no_log)
             );
 
             return false;
@@ -304,11 +306,11 @@ public class SessionDetailActivity
         new MaterialAlertDialogBuilder(
                 this
         ).setTitle(
-                "重命名会话"
+                getString(R.string.rename_session)
         ).setView(
                 input
         ).setPositiveButton(
-                "保存",
+                getString(R.string.save),
                 (dialog, which) -> {
                     String name =
                             input.getText()
@@ -322,14 +324,14 @@ public class SessionDetailActivity
                                     name
                             )) {
                         toast(
-                                "名称不能为空"
+                                getString(R.string.session_name_required)
                         );
                     }
 
                     refresh();
                 }
         ).setNegativeButton(
-                "取消",
+                getString(R.string.cancel),
                 null
         ).show();
     }
@@ -341,7 +343,7 @@ public class SessionDetailActivity
 
         if (session.active) {
             toast(
-                    "正在记录的会话不能删除"
+                    getString(R.string.active_session_cannot_delete)
             );
             return;
         }
@@ -349,11 +351,11 @@ public class SessionDetailActivity
         new MaterialAlertDialogBuilder(
                 this
         ).setTitle(
-                "删除会话记录？"
+                getString(R.string.delete_session_title)
         ).setMessage(
-                "这里只删除 ShizuLog 的会话索引和名称，不会删除原始 .log 文件。"
+                getString(R.string.delete_session_message)
         ).setPositiveButton(
-                "删除会话",
+                getString(R.string.delete_session),
                 (dialog, which) -> {
                     if (CaptureSessionManager
                             .deleteMetadata(
@@ -361,39 +363,36 @@ public class SessionDetailActivity
                                     session.id
                             )) {
                         toast(
-                                "会话记录已删除，日志文件仍保留"
+                                getString(R.string.session_deleted_keep_log)
                         );
 
                         finish();
                     } else {
                         toast(
-                                "删除失败"
+                                getString(R.string.delete_failed)
                         );
                     }
                 }
         ).setNegativeButton(
-                "取消",
+                getString(R.string.cancel),
                 null
         ).show();
     }
 
-    private static String buildDetails(
+    private String buildDetails(
             CaptureSessionManager.Session session
     ) {
         StringBuilder out =
                 new StringBuilder();
 
         out.append(
-                "模式："
+                getString(R.string.session_mode)
         ).append(
-                CaptureSessionManager
-                        .modeName(
-                                session.mode
-                        )
+                CaptureSessionManager.modeName(this, session.mode)
         ).append('\n');
 
         out.append(
-                "开始："
+                getString(R.string.session_start)
         ).append(
                 formatTime(
                         session.startedAt
@@ -401,17 +400,17 @@ public class SessionDetailActivity
         ).append('\n');
 
         out.append(
-                "结束："
+                getString(R.string.session_end)
         ).append(
                 session.active
-                        ? "仍在记录"
+                        ? getString(R.string.session_active)
                         : formatTime(
                                 session.endedAt
                         )
         ).append('\n');
 
         out.append(
-                "时长："
+                getString(R.string.session_duration)
         ).append(
                 duration(
                         session.durationMs()
@@ -419,7 +418,7 @@ public class SessionDetailActivity
         ).append('\n');
 
         out.append(
-                "日志大小："
+                getString(R.string.session_log_size)
         ).append(
                 CaptureSessionManager
                         .humanSize(
@@ -428,7 +427,7 @@ public class SessionDetailActivity
         ).append('\n');
 
         out.append(
-                "状态："
+                getString(R.string.session_status)
         ).append(
                 session.lastStatus
                         .isEmpty()
@@ -438,7 +437,7 @@ public class SessionDetailActivity
 
         if (session.packages.length > 0) {
             out.append(
-                    "\n目标应用：\n"
+                    getString(R.string.session_target_apps)
             );
 
             for (int i = 0;
@@ -480,7 +479,7 @@ public class SessionDetailActivity
 
         if (!session.logPath.isEmpty()) {
             out.append(
-                    "\n日志文件：\n"
+                    getString(R.string.session_log_file)
             ).append(
                     session.logPath
             );
@@ -504,7 +503,7 @@ public class SessionDetailActivity
         );
     }
 
-    private static String duration(
+    private String duration(
             long ms
     ) {
         long seconds =
@@ -520,20 +519,22 @@ public class SessionDetailActivity
                 minutes / 60L;
 
         if (hours > 0L) {
-            return hours
-                    + " 小时 "
-                    + (minutes % 60L)
-                    + " 分";
+            return getString(
+                    R.string.session_duration_hours,
+                    hours,
+                    minutes % 60L
+            );
         }
 
         if (minutes > 0L) {
-            return minutes
-                    + " 分 "
-                    + (seconds % 60L)
-                    + " 秒";
+            return getString(
+                    R.string.session_duration_minutes,
+                    minutes,
+                    seconds % 60L
+            );
         }
 
-        return seconds + " 秒";
+        return getString(R.string.seconds, seconds);
     }
 
     private void toast(

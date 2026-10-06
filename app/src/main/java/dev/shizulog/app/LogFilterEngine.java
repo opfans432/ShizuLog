@@ -1,5 +1,7 @@
 package dev.shizulog.app;
 
+import android.content.Context;
+
 import java.io.File;
 import java.io.RandomAccessFile;
 import java.nio.charset.StandardCharsets;
@@ -24,8 +26,8 @@ public final class LogFilterEngine {
 
     private LogFilterEngine() {}
 
-    public static Result filter(File file, Spec spec) throws Exception {
-        if (file == null || !file.isFile()) return Result.error("日志文件不存在");
+    public static Result filter(Context context, File file, Spec spec) throws Exception {
+        if (file == null || !file.isFile()) return Result.error(context.getString(R.string.log_file_not_found));
         if (spec == null) spec = Spec.all();
 
         List<Match> matches = new ArrayList<>();

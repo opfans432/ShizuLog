@@ -13,7 +13,7 @@
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
         android:background="@color/md_theme_background"
-        app:title="诊断包"
+        app:title="@string/diagnostic_pack_title"
         app:titleTextColor="@color/md_theme_onBackground" />
 
     <ScrollView
@@ -46,7 +46,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="诊断包"
+                        android:text="@string/diagnostic_pack_title"
                         android:textColor="@color/md_theme_onSurface"
                         android:textSize="20sp"
                         android:textStyle="bold" />
@@ -56,7 +56,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="6dp"
-                        android:text="准备生成诊断包"
+                        android:text="@string/diagnostic_pack_prepare"
                         android:textColor="@color/md_theme_secondary"
                         android:textSize="14sp"
                         android:textStyle="bold" />
@@ -100,7 +100,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="隐私模式"
+                        android:text="@string/privacy_mode"
                         android:textColor="@color/md_theme_onSurface"
                         android:textSize="17sp"
                         android:textStyle="bold" />
@@ -110,13 +110,13 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="6dp"
-                        android:text="脱敏版（推荐）" />
+                        android:text="@string/sanitized_mode_recommended" />
 
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:paddingStart="48dp"
-                        android:text="尝试遮盖 Authorization、Bearer Token、Cookie、access_token、API Key、Session、密码和 JWT。"
+                        android:text="@string/sanitized_mode_desc"
                         android:textColor="@color/md_theme_onSurfaceVariant"
                         android:textSize="12sp" />
 
@@ -125,13 +125,13 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="6dp"
-                        android:text="原始版" />
+                        android:text="@string/raw_mode" />
 
                     <TextView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:paddingStart="48dp"
-                        android:text="不修改原始 Logcat，适合自己留存或明确需要完整原始证据时使用。"
+                        android:text="@string/raw_mode_desc"
                         android:textColor="@color/md_theme_onSurfaceVariant"
                         android:textSize="12sp" />
                 </LinearLayout>
@@ -156,7 +156,7 @@
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="包含内容"
+                        android:text="@string/diagnostic_included_content"
                         android:textColor="@color/md_theme_onSurface"
                         android:textSize="17sp"
                         android:textStyle="bold" />
@@ -165,7 +165,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="5dp"
-                        android:text="原始/脱敏日志始终包含；以下附加信息可以关闭。"
+                        android:text="@string/diagnostic_included_content_desc"
                         android:textColor="@color/md_theme_onSurfaceVariant"
                         android:textSize="12sp" />
 
@@ -173,19 +173,19 @@
                         android:id="@+id/diagnosticIncludeCrash"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="崩溃分析摘要" />
+                        android:text="@string/diagnostic_crash_summary" />
 
                     <com.google.android.material.checkbox.MaterialCheckBox
                         android:id="@+id/diagnosticIncludeDevice"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="设备与 Android 信息" />
+                        android:text="@string/diagnostic_device_info" />
 
                     <com.google.android.material.checkbox.MaterialCheckBox
                         android:id="@+id/diagnosticIncludeTargets"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="目标应用、版本、UID/PID" />
+                        android:text="@string/diagnostic_target_info" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
@@ -194,7 +194,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="14dp"
-                android:text="生成诊断包"
+                android:text="@string/generate_diagnostic_pack"
                 android:textAllCaps="false"
                 app:cornerRadius="16dp" />
 
@@ -210,7 +210,7 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="分享"
+                    android:text="@string/share"
                     android:textAllCaps="false" />
 
                 <com.google.android.material.button.MaterialButton
@@ -220,7 +220,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginStart="6dp"
                     android:layout_weight="1"
-                    android:text="另存为"
+                    android:text="@string/save_as"
                     android:textAllCaps="false" />
 
                 <com.google.android.material.button.MaterialButton
@@ -230,7 +230,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginStart="6dp"
                     android:layout_weight="1"
-                    android:text="删除"
+                    android:text="@string/delete"
                     android:textAllCaps="false" />
             </LinearLayout>
 
@@ -240,7 +240,7 @@
                 android:layout_marginTop="12dp"
                 android:background="@color/card_surface"
                 android:padding="14dp"
-                android:text="自动脱敏只能识别常见敏感字段，不能保证覆盖所有内容。原始 Logcat 也可能包含账号标识、URL、设备标识等信息，分享前仍建议检查接收方是否可信。"
+                android:text="@string/diagnostic_privacy_warning"
                 android:textColor="@color/md_theme_onSurfaceVariant"
                 android:textSize="12sp" />
         </LinearLayout>

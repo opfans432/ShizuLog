@@ -30,7 +30,7 @@
                 android:layout_weight="1"
                 android:ellipsize="end"
                 android:maxLines="1"
-                android:text="日志"
+                android:text="@string/log_item"
                 android:textColor="@color/md_theme_onSurface"
                 android:textSize="16sp"
                 android:textStyle="bold" />
@@ -43,7 +43,7 @@
                 android:background="@color/status_error_container"
                 android:paddingHorizontal="8dp"
                 android:paddingVertical="4dp"
-                android:text="检测到崩溃"
+                android:text="@string/crash_detected_label"
                 android:textColor="@color/status_error"
                 android:textSize="11sp"
                 android:textStyle="bold"
@@ -55,7 +55,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="5dp"
-            android:text="单应用"
+            android:text="@string/single_app"
             android:textColor="@color/md_theme_secondary"
             android:textSize="12sp"
             android:textStyle="bold" />
@@ -65,7 +65,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="3dp"
-            android:text="时间 · 大小"
+            android:text="@string/time_size"
             android:textColor="@color/md_theme_onSurfaceVariant"
             android:textSize="12sp" />
 
@@ -92,7 +92,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:minWidth="0dp"
-                android:text="分析"
+                android:text="@string/analyze"
                 android:textAllCaps="false"
                 android:visibility="gone" />
 
@@ -102,7 +102,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:minWidth="0dp"
-                android:text="诊断包"
+                android:text="@string/diagnostic_pack_title"
                 android:textAllCaps="false" />
 
             <com.google.android.material.button.MaterialButton
@@ -111,7 +111,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:minWidth="0dp"
-                android:text="导出"
+                android:text="@string/export"
                 android:textAllCaps="false" />
 
             <com.google.android.material.button.MaterialButton
@@ -121,7 +121,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginStart="4dp"
                 android:minWidth="0dp"
-                android:text="删除"
+                android:text="@string/delete"
                 android:textAllCaps="false" />
         </LinearLayout>
     </LinearLayout>

@@ -1,5 +1,7 @@
 package dev.shizulog.app;
 
+import android.content.Context;
+
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -45,9 +47,14 @@ public final class RealTimeLogAnalyzer {
                     "(?i)\\bKilling\\s+(\\d+):([^/\\s]+)"
             );
 
+    private final Context context;
     private final Deque<Event> events = new ArrayDeque<>();
     private final Map<Integer, String> pidNames = new LinkedHashMap<>();
     private final Set<Integer> allSeenPids = new HashSet<>();
+
+    public RealTimeLogAnalyzer(Context context) {
+        this.context = context.getApplicationContext();
+    }
 
     private long totalLines;
     private long totalPidChanges;
@@ -78,7 +85,7 @@ public final class RealTimeLogAnalyzer {
 
         if (event.pid > 0 && allSeenPids.add(event.pid)) {
             totalPidChanges++;
-            latestProcessChange = "新增 PID " + event.pid;
+            latestProcessChange = context.getString(R.string.new_pid, event.pid);
         }
 
         parseProcessLifecycle(line);
@@ -197,7 +204,7 @@ public final class RealTimeLogAnalyzer {
             if (pid > 0) {
                 pidNames.put(pid, process);
                 totalPidChanges++;
-                latestProcessChange = "启动 " + pid + ":" + process;
+                latestProcessChange = context.getString(R.string.process_started, pid, process);
             }
             return;
         }
@@ -209,7 +216,7 @@ public final class RealTimeLogAnalyzer {
             if (pid > 0) {
                 pidNames.remove(pid);
                 totalPidChanges++;
-                latestProcessChange = "退出 " + pid + ":" + process;
+                latestProcessChange = context.getString(R.string.process_exited, pid, process);
             }
             return;
         }
@@ -221,7 +228,7 @@ public final class RealTimeLogAnalyzer {
             if (pid > 0) {
                 pidNames.remove(pid);
                 totalPidChanges++;
-                latestProcessChange = "结束 " + pid + ":" + process;
+                latestProcessChange = context.getString(R.string.process_finished, pid, process);
             }
         }
     }

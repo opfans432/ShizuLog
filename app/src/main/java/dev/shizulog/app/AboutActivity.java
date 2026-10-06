@@ -33,10 +33,10 @@ public class AboutActivity extends AppCompatActivity {
         String version = readVersionName();
 
         Chip versionChip = findViewById(R.id.aboutVersionChip);
-        versionChip.setText("v" + version);
+        versionChip.setText(getString(R.string.about_version_short, version));
 
         TextView versionText = findViewById(R.id.aboutVersionText);
-        versionText.setText("版本：v" + version);
+        versionText.setText(getString(R.string.about_version, version));
 
         findViewById(R.id.repoButton).setOnClickListener(view -> {
             Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(REPOSITORY_URL));

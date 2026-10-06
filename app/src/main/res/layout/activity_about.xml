@@ -64,7 +64,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
                 android:clickable="false"
-                android:text="v1.1.0"
+                android:text="@string/about_version_short_placeholder"
                 android:textColor="@color/status_success"
                 app:chipBackgroundColor="@color/status_success_container" />
 
@@ -167,7 +167,7 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="12dp"
-                        android:text="版本：1.1.0"
+                        android:text="@string/about_version_placeholder"
                         android:textColor="@color/md_theme_onSurface"
                         android:textSize="15sp" />
 

@@ -45,7 +45,7 @@ public final class CaptureSessionManager {
 
         finishActive(
                 context,
-                "被新的记录会话接替"
+                context.getString(R.string.status_replaced)
         );
 
         long now =
@@ -80,6 +80,7 @@ public final class CaptureSessionManager {
                 new Session(
                         id,
                         defaultName(
+                                context,
                                 mode,
                                 safeLabels,
                                 now
@@ -92,7 +93,7 @@ public final class CaptureSessionManager {
                         0L,
                         true,
                         "",
-                        "正在启动记录",
+                        context.getString(R.string.status_starting),
                         0L
                 );
 
@@ -174,7 +175,7 @@ public final class CaptureSessionManager {
                 status == null
                         || status.trim()
                         .isEmpty()
-                        ? "记录已结束"
+                        ? context.getString(R.string.status_ended)
                         : status.trim();
 
         writeSession(
@@ -216,7 +217,7 @@ public final class CaptureSessionManager {
 
         finishActive(
                 context,
-                "上次记录已结束"
+                context.getString(R.string.status_last_ended)
         );
     }
 
@@ -642,7 +643,7 @@ public final class CaptureSessionManager {
                 ),
                 object.optString(
                         "name",
-                        "未命名会话"
+                        ""
                 ),
                 object.optInt(
                         "mode",
@@ -783,6 +784,7 @@ public final class CaptureSessionManager {
     }
 
     private static String defaultName(
+            Context context,
             int mode,
             String[] labels,
             long now
@@ -793,27 +795,32 @@ public final class CaptureSessionManager {
                 == LogCaptureService
                 .MODE_GLOBAL) {
             prefix =
-                    "全局 Logcat";
+                    context.getString(R.string.global_logcat_mode);
         } else if (mode
                 == LogCaptureService
                 .MODE_MULTI) {
             prefix =
-                    labels.length > 0
-                            ? "多应用 · "
-                            + labels[0]
-                            + (labels.length > 1
-                            ? " 等 "
-                            + labels.length
-                            + " 个"
-                            : "")
-                            : "多应用";
+                    labels.length > 1
+                            ? context.getString(
+                                    R.string.multi_apps_mode_many,
+                                    labels[0],
+                                    labels.length
+                            )
+                            : labels.length == 1
+                            ? context.getString(
+                                    R.string.multi_apps_mode_one,
+                                    labels[0]
+                            )
+                            : context.getString(
+                                    R.string.mode_multi
+                            );
         } else {
             prefix =
                     labels.length > 0
                             && !labels[0]
                             .isEmpty()
                             ? labels[0]
-                            : "单应用";
+                            : context.getString(R.string.single_app_mode);
         }
 
         return prefix
@@ -827,21 +834,22 @@ public final class CaptureSessionManager {
     }
 
     public static String modeName(
+            Context context,
             int mode
     ) {
         if (mode
                 == LogCaptureService
                 .MODE_GLOBAL) {
-            return "全局";
+            return context.getString(R.string.mode_global);
         }
 
         if (mode
                 == LogCaptureService
                 .MODE_MULTI) {
-            return "多应用";
+            return context.getString(R.string.mode_multi);
         }
 
-        return "单应用";
+        return context.getString(R.string.mode_single);
     }
 
     public static String humanSize(
@@ -915,7 +923,7 @@ public final class CaptureSessionManager {
 
             this.name =
                     name == null
-                            ? "未命名会话"
+                            ? ""
                             : name;
 
             this.mode =

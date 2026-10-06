@@ -7,12 +7,15 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.app.AppCompatDelegate;
 import androidx.core.graphics.Insets;
+import androidx.core.os.LocaleListCompat;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.google.android.material.materialswitch.MaterialSwitch;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -84,6 +87,8 @@ public class WorkspaceActivity
                         R.id.workspaceLatestOpen
                 );
 
+        setupLanguageSwitch();
+
         findViewById(
                 R.id.workspaceCapture
         ).setOnClickListener(
@@ -143,6 +148,54 @@ public class WorkspaceActivity
         );
     }
 
+    private void setupLanguageSwitch() {
+        MaterialSwitch languageSwitch =
+                findViewById(
+                        R.id.workspaceEnglishSwitch
+                );
+
+        languageSwitch.setChecked(
+                isEnglishApplicationLocale()
+        );
+
+        languageSwitch.setOnCheckedChangeListener(
+                (buttonView, isChecked) ->
+                        AppCompatDelegate.setApplicationLocales(
+                                LocaleListCompat.forLanguageTags(
+                                        isChecked
+                                                ? "en"
+                                                : "zh-CN"
+                                )
+                        )
+        );
+    }
+
+    private boolean isEnglishApplicationLocale() {
+        LocaleListCompat locales =
+                AppCompatDelegate.getApplicationLocales();
+
+        if (!locales.isEmpty()) {
+            return "en".equals(
+                    locales.get(0).getLanguage()
+            );
+        }
+
+        if (getResources()
+                .getConfiguration()
+                .getLocales()
+                .isEmpty()) {
+            return false;
+        }
+
+        return "en".equals(
+                getResources()
+                        .getConfiguration()
+                        .getLocales()
+                        .get(0)
+                        .getLanguage()
+        );
+    }
+
     @Override
     protected void onResume() {
         super.onResume();
@@ -171,15 +224,18 @@ public class WorkspaceActivity
         }
 
         summary.setText(
-                sessions.size()
-                        + " 个会话 · "
-                        + withLog
-                        + " 份可用日志"
-                        + (active > 0
-                        ? " · "
-                        + active
-                        + " 个正在记录"
-                        : "")
+                active > 0
+                        ? getString(
+                                R.string.workspace_summary_active,
+                                sessions.size(),
+                                withLog,
+                                active
+                        )
+                        : getString(
+                                R.string.workspace_summary,
+                                sessions.size(),
+                                withLog
+                        )
         );
 
         latestSession =
@@ -189,11 +245,11 @@ public class WorkspaceActivity
 
         if (latestSession == null) {
             latestTitle.setText(
-                    "还没有记录会话"
+                    getString(R.string.no_recording_sessions)
             );
 
             latestMeta.setText(
-                    "进入“实时日志”开始第一次记录"
+                    getString(R.string.start_first_recording)
             );
 
             latestButton.setEnabled(
@@ -201,25 +257,24 @@ public class WorkspaceActivity
             );
 
             latestButton.setText(
-                    "暂无会话"
+                    getString(R.string.no_sessions_available)
             );
 
             return;
         }
 
         latestTitle.setText(
-                latestSession.name
+                latestSession.name.isEmpty()
+                        ? getString(R.string.unnamed_session)
+                        : latestSession.name
         );
 
         latestMeta.setText(
                 (latestSession.active
-                        ? "● 正在记录"
-                        : "已结束")
+                        ? getString(R.string.recording_indicator)
+                        : getString(R.string.session_ended))
                         + " · "
-                        + CaptureSessionManager
-                        .modeName(
-                                latestSession.mode
-                        )
+                        + CaptureSessionManager.modeName(this, latestSession.mode)
                         + " · "
                         + formatTime(
                                 latestSession
@@ -235,7 +290,7 @@ public class WorkspaceActivity
 
         latestButton.setEnabled(true);
         latestButton.setText(
-                "打开最近会话"
+                getString(R.string.open_recent_session)
         );
     }
 
@@ -262,7 +317,7 @@ public class WorkspaceActivity
         if (available.isEmpty()) {
             Toast.makeText(
                     this,
-                    "还没有可分析的会话日志",
+                    getString(R.string.no_analyzable_session_logs),
                     Toast.LENGTH_SHORT
             ).show();
 
@@ -307,8 +362,8 @@ public class WorkspaceActivity
                 this
         ).setTitle(
                 crash
-                        ? "选择崩溃分析会话"
-                        : "选择日志分析会话"
+                        ? getString(R.string.choose_crash_session)
+                        : getString(R.string.choose_log_session)
         ).setItems(
                 items,
                 (dialog, which) ->
@@ -319,7 +374,7 @@ public class WorkspaceActivity
                                 crash
                         )
         ).setNegativeButton(
-                "取消",
+                getString(R.string.cancel),
                 null
         ).show();
     }
@@ -359,11 +414,11 @@ public class WorkspaceActivity
         );
     }
 
-    private static String formatTime(
+    private String formatTime(
             long time
     ) {
         if (time <= 0L) {
-            return "未知时间";
+            return getString(R.string.unknown_time);
         }
 
         return new SimpleDateFormat(

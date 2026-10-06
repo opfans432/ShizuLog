@@ -189,10 +189,10 @@ final class AppPickerDialog extends Dialog {
                     if (closed || !isShowing()) return;
                     if (showBlockingLoading || allApps.isEmpty()) {
                         showLoading(false);
-                        emptyText.setText("读取应用列表失败");
+                        emptyText.setText(appContext.getString(R.string.read_app_list_failed));
                         emptyText.setVisibility(View.VISIBLE);
                         appList.setVisibility(View.GONE);
-                        resultCountText.setText("0 个应用");
+                        resultCountText.setText(appContext.getString(R.string.app_count, 0));
                     }
                 });
             }
@@ -271,10 +271,10 @@ final class AppPickerDialog extends Dialog {
         }
 
         adapter.replace(filtered);
-        resultCountText.setText(filtered.size() + " 个应用");
+        resultCountText.setText(appContext.getString(R.string.app_count, filtered.size()));
 
         boolean empty = filtered.isEmpty() && !allApps.isEmpty();
-        emptyText.setText("未找到匹配的应用");
+        emptyText.setText(appContext.getString(R.string.no_matching_apps));
         emptyText.setVisibility(empty ? View.VISIBLE : View.GONE);
         appList.setVisibility(empty ? View.GONE : View.VISIBLE);
     }
@@ -297,7 +297,7 @@ final class AppPickerDialog extends Dialog {
         if (loading && allApps.isEmpty()) {
             appList.setVisibility(View.GONE);
             emptyText.setVisibility(View.GONE);
-            resultCountText.setText("正在读取…");
+            resultCountText.setText(appContext.getString(R.string.loading));
         } else if (!allApps.isEmpty()) {
             appList.setVisibility(View.VISIBLE);
         }

@@ -1,5 +1,7 @@
 package dev.shizulog.app;
 
+import android.content.Context;
+
 import java.io.File;
 import java.io.RandomAccessFile;
 import java.nio.charset.StandardCharsets;
@@ -49,10 +51,11 @@ public final class CrashAnalyzer {
 
     private CrashAnalyzer() {}
 
-    public static Result analyze(File file) {
+    public static Result analyze(Context context, File file) {
         if (file == null || !file.isFile()) {
             return Result.empty(
-                    "日志文件不存在"
+                    context,
+                    context.getString(R.string.log_file_not_found)
             );
         }
 
@@ -65,14 +68,15 @@ public final class CrashAnalyzer {
             );
         } catch (Exception e) {
             return Result.empty(
-                    "读取失败："
-                            + safeMessage(e)
+                    context,
+                    context.getString(R.string.read_failed, safeMessage(e))
             );
         }
 
         if (text.isEmpty()) {
             return Result.empty(
-                    "日志文件为空"
+                    context,
+                    context.getString(R.string.empty_log_file)
             );
         }
 
@@ -102,12 +106,14 @@ public final class CrashAnalyzer {
 
         if (latest < 0) {
             return Result.empty(
-                    "未检测到明显崩溃标记"
+                    context,
+                    context.getString(R.string.no_crash_marker)
             );
         }
 
         if (latest == javaIndex) {
             return analyzeJavaCrash(
+                    context,
                     text,
                     javaIndex
             );
@@ -115,18 +121,21 @@ public final class CrashAnalyzer {
 
         if (latest == anrIndex) {
             return analyzeAnr(
+                    context,
                     text,
                     anrIndex
             );
         }
 
         return analyzeNativeCrash(
+                context,
                 text,
                 nativeIndex
         );
     }
 
     private static Result analyzeJavaCrash(
+            Context context,
             String text,
             int index
     ) {
@@ -263,7 +272,7 @@ public final class CrashAnalyzer {
 
         return new Result(
                 true,
-                "Java 崩溃",
+                context.getString(R.string.crash_java),
                 process,
                 pid,
                 thread,
@@ -271,9 +280,10 @@ public final class CrashAnalyzer {
                 causeText,
                 keyLocation,
                 "FATAL EXCEPTION",
-                trimStackExcerpt(block),
+                trimStackExcerpt(context, block),
                 buildSummary(
-                        "Java 崩溃",
+                        context,
+                        context.getString(R.string.crash_java),
                         process,
                         pid,
                         thread,
@@ -285,6 +295,7 @@ public final class CrashAnalyzer {
     }
 
     private static Result analyzeAnr(
+            Context context,
             String text,
             int index
     ) {
@@ -354,20 +365,21 @@ public final class CrashAnalyzer {
 
         return new Result(
                 true,
-                "ANR / 无响应",
+                context.getString(R.string.crash_anr),
                 process,
                 "",
-                "main（可能）",
+                context.getString(R.string.crash_anr_thread),
                 "Application Not Responding",
                 reason,
                 keyLocation,
                 "ANR",
-                trimStackExcerpt(block),
+                trimStackExcerpt(context, block),
                 buildSummary(
-                        "ANR / 无响应",
+                        context,
+                        context.getString(R.string.crash_anr),
                         process,
                         "",
-                        "main（可能）",
+                        context.getString(R.string.crash_anr_thread),
                         "Application Not Responding",
                         reason,
                         keyLocation
@@ -376,6 +388,7 @@ public final class CrashAnalyzer {
     }
 
     private static Result analyzeNativeCrash(
+            Context context,
             String text,
             int index
     ) {
@@ -462,7 +475,7 @@ public final class CrashAnalyzer {
 
         return new Result(
                 true,
-                "Native 崩溃",
+                context.getString(R.string.crash_native),
                 process,
                 pid,
                 thread,
@@ -472,9 +485,10 @@ public final class CrashAnalyzer {
                 ),
                 keyLocation,
                 "Native signal",
-                trimStackExcerpt(block),
+                trimStackExcerpt(context, block),
                 buildSummary(
-                        "Native 崩溃",
+                        context,
+                        context.getString(R.string.crash_native),
                         process,
                         pid,
                         thread,
@@ -692,6 +706,7 @@ public final class CrashAnalyzer {
     }
 
     private static String trimStackExcerpt(
+            Context context,
             String block
     ) {
         if (block == null
@@ -713,7 +728,7 @@ public final class CrashAnalyzer {
         for (String line : lines) {
             if (count >= MAX_STACK_LINES) {
                 out.append(
-                        "…（堆栈过长，已截断；完整内容请打开原始日志）"
+                        context.getString(R.string.crash_stack_truncated)
                 );
                 break;
             }
@@ -767,6 +782,7 @@ public final class CrashAnalyzer {
     }
 
     private static String buildSummary(
+            Context context,
             String type,
             String process,
             String pid,
@@ -780,43 +796,43 @@ public final class CrashAnalyzer {
 
         appendSummaryLine(
                 out,
-                "类型",
+                context.getString(R.string.crash_type),
                 type
         );
 
         appendSummaryLine(
                 out,
-                "进程",
+                context.getString(R.string.crash_process),
                 process
         );
 
         appendSummaryLine(
                 out,
-                "PID",
+                context.getString(R.string.crash_pid_label),
                 pid
         );
 
         appendSummaryLine(
                 out,
-                "线程",
+                context.getString(R.string.crash_thread),
                 thread
         );
 
         appendSummaryLine(
                 out,
-                "异常",
+                context.getString(R.string.crash_exception_label),
                 exception
         );
 
         appendSummaryLine(
                 out,
-                "原因",
+                context.getString(R.string.crash_reason),
                 cause
         );
 
         appendSummaryLine(
                 out,
-                "关键位置",
+                context.getString(R.string.crash_key_location),
                 keyLocation
         );
 
@@ -1121,11 +1137,12 @@ public final class CrashAnalyzer {
         }
 
         static Result empty(
+                Context context,
                 String reason
         ) {
             return new Result(
                     false,
-                    "未检测到",
+                    context.getString(R.string.crash_not_detected),
                     "",
                     "",
                     "",
@@ -1134,8 +1151,7 @@ public final class CrashAnalyzer {
                     "",
                     "",
                     "",
-                    "未检测到明显崩溃\n"
-                            + reason
+                    context.getString(R.string.crash_summary_not_detected, reason)
             );
         }
     }

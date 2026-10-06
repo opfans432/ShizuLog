@@ -93,14 +93,14 @@ public final class DiagnosticPackExporter {
     ) {
         if (context == null) {
             return Result.error(
-                    "Context 不可用"
+                    "Context unavailable"
             );
         }
 
         if (logFile == null
                 || !logFile.isFile()) {
             return Result.error(
-                    "当前没有可导出的日志文件"
+                    context.getString(R.string.diagnostic_no_exportable_log)
             );
         }
 
@@ -123,7 +123,7 @@ public final class DiagnosticPackExporter {
 
             if (baseDir == null) {
                 return Result.error(
-                        "应用 Documents 目录不可用"
+                        context.getString(R.string.diagnostic_documents_unavailable)
                 );
             }
 
@@ -136,7 +136,7 @@ public final class DiagnosticPackExporter {
             if (!exportDir.exists()
                     && !exportDir.mkdirs()) {
                 return Result.error(
-                        "无法创建诊断包目录"
+                        context.getString(R.string.diagnostic_dir_failed)
                 );
             }
 
@@ -162,7 +162,7 @@ public final class DiagnosticPackExporter {
 
             notify(
                     callback,
-                    "正在读取日志信息…"
+                    context.getString(R.string.diagnostic_reading_log_info)
             );
 
             HeaderInfo header =
@@ -213,11 +213,12 @@ public final class DiagnosticPackExporter {
             if (options.includeCrashSummary) {
                 notify(
                         callback,
-                        "正在分析崩溃摘要…"
+                        context.getString(R.string.diagnostic_analyzing_crash)
                 );
 
                 crash =
                         CrashAnalyzer.analyze(
+                                context,
                                 logFile
                         );
             }
@@ -228,7 +229,7 @@ public final class DiagnosticPackExporter {
             if (options.includeTargetInfo) {
                 notify(
                         callback,
-                        "正在整理目标应用信息…"
+                        context.getString(R.string.diagnostic_collecting_target_info)
                 );
 
                 recentPids =
@@ -243,8 +244,8 @@ public final class DiagnosticPackExporter {
             notify(
                     callback,
                     options.redactLog
-                            ? "正在脱敏并打包日志…"
-                            : "正在打包原始日志…"
+                            ? context.getString(R.string.diagnostic_packaging_sanitized)
+                            : context.getString(R.string.diagnostic_packaging_raw)
             );
 
             try (ZipOutputStream zip =
@@ -261,6 +262,7 @@ public final class DiagnosticPackExporter {
                         hashes,
                         "README.txt",
                         buildReadme(
+                                context,
                                 options
                         )
                 );
@@ -307,7 +309,7 @@ public final class DiagnosticPackExporter {
                                     || crash.summary == null
                                     || crash.summary
                                             .isEmpty()
-                                    ? "未检测到明显崩溃"
+                                    ? context.getString(R.string.diagnostic_no_crash)
                                     : crash.summary;
 
                     if (options.redactLog) {
@@ -359,7 +361,7 @@ public final class DiagnosticPackExporter {
 
             notify(
                     callback,
-                    "诊断包已生成"
+                    context.getString(R.string.diagnostic_pack_generated)
             );
 
             return Result.success(
@@ -573,25 +575,16 @@ public final class DiagnosticPackExporter {
     }
 
     private static String buildReadme(
+            Context context,
             Options options
     ) {
-        return ""
-                + "ShizuLog Diagnostic Pack\n"
-                + "========================\n\n"
-                + "privacy_mode="
-                + (options.redactLog
-                        ? "redacted"
-                        : "raw")
-                + "\n\n"
-                + "该 ZIP 由 ShizuLog 在设备本地生成，用于 Android 应用排错。\n\n"
-                + "日志模式："
-                + (options.redactLog
-                        ? "脱敏版。常见 Token、Authorization、Cookie、密码字段会尝试替换为 <REDACTED>。"
-                        : "原始版。日志内容不会被 ShizuLog 主动修改。")
-                + "\n\n"
-                + "不会主动包含 ShizuLog 发布签名私钥、GitHub Actions Secrets、"
-                + "SIGNING-RECOVERY.env 或其他应用私有文件。\n\n"
-                + "注意：自动脱敏只能覆盖常见格式，不能保证识别所有敏感信息；分享前仍建议确认接收方可信。\n";
+        return context.getString(
+                R.string.diagnostic_readme,
+                options.redactLog ? "redacted" : "raw",
+                options.redactLog
+                        ? context.getString(R.string.diagnostic_redacted_readme)
+                        : context.getString(R.string.diagnostic_raw_readme)
+        );
     }
 
     private static String buildMetadata(
@@ -833,8 +826,8 @@ public final class DiagnosticPackExporter {
             String headerUids
     ) {
         if (packages.isEmpty()) {
-            return "未选择目标应用\n"
-                    + "header_uids="
+            return context.getString(R.string.unselected_target)
+                    + "\nheader_uids="
                     + headerUids
                     + "\n";
         }

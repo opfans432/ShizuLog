@@ -13,7 +13,7 @@
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
         android:background="@color/md_theme_background"
-        app:title="日志分析"
+        app:title="@string/log_analysis_title"
         app:titleTextColor="@color/md_theme_onBackground" />
 
     <com.google.android.material.card.MaterialCardView
@@ -36,7 +36,7 @@
             <com.google.android.material.textfield.TextInputLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="搜索整份日志"
+                android:hint="@string/full_log_search_hint"
                 app:boxBackgroundMode="outline"
                 app:endIconMode="clear_text"
                 app:startIconDrawable="@drawable/ic_search_24">
@@ -66,14 +66,14 @@
                         android:id="@+id/fullLogRegex"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="正则" />
+                        android:text="@string/regex" />
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/fullLogSearchButton"
                         style="@style/Widget.Material3.Button.OutlinedButton"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="搜索"
+                        android:text="@string/search"
                         android:textAllCaps="false" />
 
                     <com.google.android.material.button.MaterialButton
@@ -82,7 +82,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:minWidth="0dp"
-                        android:text="上一个"
+                        android:text="@string/previous"
                         android:textAllCaps="false" />
 
                     <com.google.android.material.button.MaterialButton
@@ -91,7 +91,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:minWidth="0dp"
-                        android:text="下一个"
+                        android:text="@string/next"
                         android:textAllCaps="false" />
                 </LinearLayout>
             </HorizontalScrollView>
@@ -100,7 +100,7 @@
                 android:id="@+id/fullLogSearchStatus"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="整份搜索 · 最多 5000 个匹配索引"
+                android:text="@string/full_search_limit"
                 android:textColor="@color/md_theme_onSurfaceVariant"
                 android:textSize="12sp" />
         </LinearLayout>
@@ -140,7 +140,7 @@
                         style="@style/Widget.Material3.Button.OutlinedButton"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="全部"
+                        android:text="@string/log_all"
                         android:textAllCaps="false" />
 
                     <com.google.android.material.button.MaterialButton
@@ -148,7 +148,7 @@
                         style="@style/Widget.Material3.Button.OutlinedButton"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="D+"
+                        android:text="@string/log_debug_plus"
                         android:textAllCaps="false" />
 
                     <com.google.android.material.button.MaterialButton
@@ -156,7 +156,7 @@
                         style="@style/Widget.Material3.Button.OutlinedButton"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="I+"
+                        android:text="@string/log_info_plus"
                         android:textAllCaps="false" />
 
                     <com.google.android.material.button.MaterialButton
@@ -164,7 +164,7 @@
                         style="@style/Widget.Material3.Button.OutlinedButton"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="W+"
+                        android:text="@string/log_warn_plus"
                         android:textAllCaps="false" />
 
                     <com.google.android.material.button.MaterialButton
@@ -172,7 +172,7 @@
                         style="@style/Widget.Material3.Button.OutlinedButton"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="E+"
+                        android:text="@string/log_error_plus"
                         android:textAllCaps="false" />
                 </com.google.android.material.button.MaterialButtonToggleGroup>
             </HorizontalScrollView>
@@ -186,7 +186,7 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:hint="Tag">
+                    android:hint="@string/tag_hint">
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/fullLogFilterTag"
                         android:layout_width="match_parent"
@@ -198,7 +198,7 @@
                     android:layout_width="100dp"
                     android:layout_height="wrap_content"
                     android:layout_marginStart="6dp"
-                    android:hint="PID">
+                    android:hint="@string/pid_hint">
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/fullLogFilterPid"
                         android:layout_width="match_parent"
@@ -217,7 +217,7 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:hint="进程 / 包名">
+                    android:hint="@string/process_package_hint">
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/fullLogFilterProcess"
                         android:layout_width="match_parent"
@@ -230,7 +230,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginStart="6dp"
                     android:layout_weight="1"
-                    android:hint="正文关键字">
+                    android:hint="@string/body_keyword_hint">
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/fullLogFilterText"
                         android:layout_width="match_parent"
@@ -253,13 +253,13 @@
                         android:id="@+id/fullLogFilterCrashOnly"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="仅崩溃" />
+                        android:text="@string/crash_only" />
 
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/fullLogFilterApply"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="应用筛选"
+                        android:text="@string/apply_filter"
                         android:textAllCaps="false" />
 
                     <com.google.android.material.button.MaterialButton
@@ -268,7 +268,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:minWidth="0dp"
-                        android:text="筛上个"
+                        android:text="@string/filter_previous"
                         android:textAllCaps="false" />
 
                     <com.google.android.material.button.MaterialButton
@@ -277,7 +277,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:minWidth="0dp"
-                        android:text="筛下个"
+                        android:text="@string/filter_next"
                         android:textAllCaps="false" />
 
                     <com.google.android.material.button.MaterialButton
@@ -285,7 +285,7 @@
                         style="@style/Widget.Material3.Button.OutlinedButton"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="预设"
+                        android:text="@string/filter_presets"
                         android:textAllCaps="false" />
 
                     <com.google.android.material.button.MaterialButton
@@ -294,7 +294,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:minWidth="0dp"
-                        android:text="保存预设"
+                        android:text="@string/save_filter_preset"
                         android:textAllCaps="false" />
 
                     <com.google.android.material.button.MaterialButton
@@ -303,7 +303,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:minWidth="0dp"
-                        android:text="清除"
+                        android:text="@string/clear"
                         android:textAllCaps="false" />
                 </LinearLayout>
             </HorizontalScrollView>
@@ -312,7 +312,7 @@
                 android:id="@+id/fullLogFilterStatus"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="未应用过滤"
+                android:text="@string/no_filter_applied"
                 android:textColor="@color/md_theme_onSurfaceVariant"
                 android:textSize="12sp" />
         </LinearLayout>
@@ -338,13 +338,13 @@
             android:orientation="horizontal"
             android:paddingHorizontal="8dp">
 
-            <com.google.android.material.button.MaterialButton android:id="@+id/fullLogFirst" style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="第一页" android:textAllCaps="false" />
-            <com.google.android.material.button.MaterialButton android:id="@+id/fullLogPrev" style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="上一页" android:textAllCaps="false" />
-            <TextView android:id="@+id/fullLogPageIndicator" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginHorizontal="8dp" android:text="第 1 / 1 页" android:textColor="@color/md_theme_onSurface" android:textSize="12sp" android:textStyle="bold" />
-            <com.google.android.material.button.MaterialButton android:id="@+id/fullLogNext" style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="下一页" android:textAllCaps="false" />
-            <com.google.android.material.button.MaterialButton android:id="@+id/fullLogLast" style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="最后一页" android:textAllCaps="false" />
-            <com.google.android.material.button.MaterialButton android:id="@+id/fullLogRefresh" style="@style/Widget.Material3.Button.TextButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:minWidth="0dp" android:text="刷新" android:textAllCaps="false" />
-            <com.google.android.material.button.MaterialButton android:id="@+id/fullLogBottom" style="@style/Widget.Material3.Button.TextButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:minWidth="0dp" android:text="到底部" android:textAllCaps="false" />
+            <com.google.android.material.button.MaterialButton android:id="@+id/fullLogFirst" style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/first_page" android:textAllCaps="false" />
+            <com.google.android.material.button.MaterialButton android:id="@+id/fullLogPrev" style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/previous_page" android:textAllCaps="false" />
+            <TextView android:id="@+id/fullLogPageIndicator" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginHorizontal="8dp" android:text="@string/page_indicator" android:textColor="@color/md_theme_onSurface" android:textSize="12sp" android:textStyle="bold" />
+            <com.google.android.material.button.MaterialButton android:id="@+id/fullLogNext" style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/next_page" android:textAllCaps="false" />
+            <com.google.android.material.button.MaterialButton android:id="@+id/fullLogLast" style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/last_page" android:textAllCaps="false" />
+            <com.google.android.material.button.MaterialButton android:id="@+id/fullLogRefresh" style="@style/Widget.Material3.Button.TextButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:minWidth="0dp" android:text="@string/refresh" android:textAllCaps="false" />
+            <com.google.android.material.button.MaterialButton android:id="@+id/fullLogBottom" style="@style/Widget.Material3.Button.TextButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:minWidth="0dp" android:text="@string/bottom" android:textAllCaps="false" />
         </LinearLayout>
     </HorizontalScrollView>
 
@@ -360,14 +360,14 @@
             android:paddingHorizontal="8dp"
             android:paddingBottom="4dp">
 
-            <com.google.android.material.button.MaterialButton android:id="@+id/fullLogNextError" style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="跳 ERROR" android:textAllCaps="false" />
-            <com.google.android.material.button.MaterialButton android:id="@+id/fullLogCopyBlock" style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="复制错误块" android:textAllCaps="false" />
-            <com.google.android.material.button.MaterialButton android:id="@+id/fullLogBookmarkAdd" style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="☆ 收藏" android:textAllCaps="false" />
-            <com.google.android.material.button.MaterialButton android:id="@+id/fullLogBookmarkList" style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="书签 0" android:textAllCaps="false" />
-            <com.google.android.material.button.MaterialButton android:id="@+id/fullLogBookmarkRemove" style="@style/Widget.Material3.Button.TextButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:minWidth="0dp" android:text="取消收藏" android:textAllCaps="false" />
-            <com.google.android.material.button.MaterialButton android:id="@+id/fullLogTextSmaller" style="@style/Widget.Material3.Button.TextButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:minWidth="0dp" android:text="A−" android:textAllCaps="false" />
-            <com.google.android.material.button.MaterialButton android:id="@+id/fullLogTextLarger" style="@style/Widget.Material3.Button.TextButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:minWidth="0dp" android:text="A+" android:textAllCaps="false" />
-            <com.google.android.material.button.MaterialButton android:id="@+id/fullLogWrap" style="@style/Widget.Material3.Button.TextButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:minWidth="0dp" android:text="自动换行：开" android:textAllCaps="false" />
+            <com.google.android.material.button.MaterialButton android:id="@+id/fullLogNextError" style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/jump_error" android:textAllCaps="false" />
+            <com.google.android.material.button.MaterialButton android:id="@+id/fullLogCopyBlock" style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/copy_error_block" android:textAllCaps="false" />
+            <com.google.android.material.button.MaterialButton android:id="@+id/fullLogBookmarkAdd" style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/add_bookmark" android:textAllCaps="false" />
+            <com.google.android.material.button.MaterialButton android:id="@+id/fullLogBookmarkList" style="@style/Widget.Material3.Button.OutlinedButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="@string/bookmark_count_zero" android:textAllCaps="false" />
+            <com.google.android.material.button.MaterialButton android:id="@+id/fullLogBookmarkRemove" style="@style/Widget.Material3.Button.TextButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:minWidth="0dp" android:text="@string/remove_bookmark" android:textAllCaps="false" />
+            <com.google.android.material.button.MaterialButton android:id="@+id/fullLogTextSmaller" style="@style/Widget.Material3.Button.TextButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:minWidth="0dp" android:text="@string/text_smaller" android:textAllCaps="false" />
+            <com.google.android.material.button.MaterialButton android:id="@+id/fullLogTextLarger" style="@style/Widget.Material3.Button.TextButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:minWidth="0dp" android:text="@string/text_larger" android:textAllCaps="false" />
+            <com.google.android.material.button.MaterialButton android:id="@+id/fullLogWrap" style="@style/Widget.Material3.Button.TextButton" android:layout_width="wrap_content" android:layout_height="wrap_content" android:minWidth="0dp" android:text="@string/wrap_on" android:textAllCaps="false" />
         </LinearLayout>
     </HorizontalScrollView>
 

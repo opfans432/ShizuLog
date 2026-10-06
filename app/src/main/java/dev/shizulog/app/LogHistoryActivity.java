@@ -230,11 +230,11 @@ public class LogHistoryActivity extends AppCompatActivity {
         sortMode = (sortMode + 1) % 3;
 
         if (sortMode == SORT_LARGEST) {
-            sortButton.setText("排序：最大");
+            sortButton.setText(getString(R.string.sort_largest));
         } else if (sortMode == SORT_OLDEST) {
-            sortButton.setText("排序：最旧");
+            sortButton.setText(getString(R.string.sort_oldest));
         } else {
-            sortButton.setText("排序：最新");
+            sortButton.setText(getString(R.string.sort_latest));
         }
 
         applyFilter();
@@ -442,7 +442,7 @@ public class LogHistoryActivity extends AppCompatActivity {
             String packages
     ) {
         if ("global".equals(mode)) {
-            return "全局 Logcat";
+            return getString(R.string.global_logcat_mode);
         }
 
         String[] packageList =
@@ -450,12 +450,10 @@ public class LogHistoryActivity extends AppCompatActivity {
 
         if ("multi".equals(mode)) {
             if (packageList.length > 0) {
-                return "多应用 · "
-                        + packageList.length
-                        + " 个应用";
+                return getString(R.string.multi_apps_mode_count, packageList.length);
             }
 
-            return "多应用记录";
+            return getString(R.string.multi_apps_recording);
         }
 
         if (packageList.length > 0) {
@@ -464,7 +462,7 @@ public class LogHistoryActivity extends AppCompatActivity {
             );
         }
 
-        return "日志记录";
+        return getString(R.string.log_recording);
     }
 
     private String buildPackageSummary(
@@ -487,7 +485,7 @@ public class LogHistoryActivity extends AppCompatActivity {
 
         for (int i = 0; i < shown; i++) {
             if (i > 0) {
-                out.append("、");
+                out.append(getString(R.string.list_separator));
             }
 
             out.append(
@@ -498,7 +496,7 @@ public class LogHistoryActivity extends AppCompatActivity {
         }
 
         if (packageList.length > shown) {
-            out.append(" 等");
+            out.append(getString(R.string.list_more_suffix));
         }
 
         return out.toString();
@@ -596,22 +594,22 @@ public class LogHistoryActivity extends AppCompatActivity {
         return "single";
     }
 
-    private static String modeLabel(
+    private String modeLabel(
             String mode
     ) {
         if ("global".equals(mode)) {
-            return "全局";
+            return getString(R.string.mode_global);
         }
 
         if ("multi".equals(mode)) {
-            return "多应用";
+            return getString(R.string.mode_multi);
         }
 
         if ("single".equals(mode)) {
-            return "单应用";
+            return getString(R.string.mode_single);
         }
 
-        return "未知";
+        return getString(R.string.mode_unknown);
     }
 
     private static String readHeadText(
@@ -804,12 +802,12 @@ public class LogHistoryActivity extends AppCompatActivity {
         }
 
         summaryText.setText(
-                "显示 "
-                        + visibleEntries.size()
-                        + " / "
-                        + allEntries.size()
-                        + " · 总占用 "
-                        + humanSize(totalBytes)
+                getString(
+                        R.string.history_summary,
+                        visibleEntries.size(),
+                        allEntries.size(),
+                        humanSize(totalBytes)
+                )
         );
 
         boolean empty =
@@ -820,8 +818,8 @@ public class LogHistoryActivity extends AppCompatActivity {
 
         emptyText.setText(
                 allEntries.isEmpty()
-                        ? "还没有历史日志\n开始记录后，每次日志会话都会保存在这里"
-                        : "没有符合当前搜索或筛选条件的日志"
+                        ? getString(R.string.history_empty)
+                        : getString(R.string.history_no_matches)
         );
 
         emptyText.setVisibility(
@@ -869,7 +867,7 @@ public class LogHistoryActivity extends AppCompatActivity {
     private void openDiagnosticPack(File file) {
         if (file == null
                 || !file.isFile()) {
-            toast("日志文件不存在");
+            toast(getString(R.string.log_file_not_found));
             return;
         }
 
@@ -890,7 +888,7 @@ public class LogHistoryActivity extends AppCompatActivity {
     private void openCrashAnalysis(File file) {
         if (file == null
                 || !file.isFile()) {
-            toast("日志文件不存在");
+            toast(getString(R.string.log_file_not_found));
             return;
         }
 
@@ -926,7 +924,7 @@ public class LogHistoryActivity extends AppCompatActivity {
     private void requestExport(File file) {
         if (file == null
                 || !file.isFile()) {
-            toast("日志文件不存在");
+            toast(getString(R.string.log_file_not_found));
             return;
         }
 
@@ -994,7 +992,7 @@ public class LogHistoryActivity extends AppCompatActivity {
 
             if (out == null) {
                 throw new IllegalStateException(
-                        "无法打开导出位置"
+                        getString(R.string.cannot_open_export_location)
                 );
             }
 
@@ -1014,12 +1012,9 @@ public class LogHistoryActivity extends AppCompatActivity {
             }
 
             out.flush();
-            toast("日志已导出");
+            toast(getString(R.string.log_exported));
         } catch (Exception e) {
-            toast(
-                    "导出失败："
-                            + e.getMessage()
-            );
+            toast(getString(R.string.export_failed, e.getMessage()));
         } finally {
             pendingExportFile = null;
         }
@@ -1031,14 +1026,12 @@ public class LogHistoryActivity extends AppCompatActivity {
         if (isCurrentRecordingFile(
                 entry.file
         )) {
-            toast(
-                    "当前正在记录的日志不能删除"
-            );
+            toast(getString(R.string.cannot_delete_current_log));
             return;
         }
 
         new MaterialAlertDialogBuilder(this)
-                .setTitle("删除这份日志？")
+                .setTitle(getString(R.string.delete_log_title))
                 .setMessage(
                         entry.file.getName()
                                 + "\n"
@@ -1047,14 +1040,14 @@ public class LogHistoryActivity extends AppCompatActivity {
                                 )
                 )
                 .setPositiveButton(
-                        "删除",
+                        getString(R.string.delete),
                         (dialog, which) ->
                                 deleteLogAsync(
                                         entry.file
                                 )
                 )
                 .setNegativeButton(
-                        "取消",
+                        getString(R.string.cancel),
                         null
                 )
                 .show();
@@ -1068,8 +1061,8 @@ public class LogHistoryActivity extends AppCompatActivity {
             uiHandler.post(() -> {
                 toast(
                         deleted
-                                ? "已删除"
-                                : "删除失败"
+                                ? getString(R.string.deleted)
+                                : getString(R.string.delete_failed)
                 );
                 loadHistoryAsync();
             });
@@ -1078,13 +1071,13 @@ public class LogHistoryActivity extends AppCompatActivity {
 
     private void showCleanupDialog() {
         String[] options = {
-                "删除 7 天前的日志",
-                "删除 30 天前的日志",
-                "删除全部历史日志"
+                getString(R.string.cleanup_7_days),
+                getString(R.string.cleanup_30_days),
+                getString(R.string.cleanup_all)
         };
 
         new MaterialAlertDialogBuilder(this)
-                .setTitle("清理历史日志")
+                .setTitle(getString(R.string.cleanup_history_title))
                 .setItems(
                         options,
                         (dialog, which) -> {
@@ -1098,7 +1091,7 @@ public class LogHistoryActivity extends AppCompatActivity {
                         }
                 )
                 .setNegativeButton(
-                        "取消",
+                        getString(R.string.cancel),
                         null
                 )
                 .show();
@@ -1111,24 +1104,22 @@ public class LogHistoryActivity extends AppCompatActivity {
 
         if (days <= 0) {
             message =
-                    "将删除所有历史日志。当前正在记录的文件会自动跳过。";
+                    getString(R.string.cleanup_all_message);
         } else {
             message =
-                    "将删除 "
-                            + days
-                            + " 天前的日志。当前正在记录的文件会自动跳过。";
+                    getString(R.string.cleanup_days_message, days);
         }
 
         new MaterialAlertDialogBuilder(this)
-                .setTitle("确认清理")
+                .setTitle(getString(R.string.confirm_cleanup_title))
                 .setMessage(message)
                 .setPositiveButton(
-                        "清理",
+                        getString(R.string.cleanup_action),
                         (dialog, which) ->
                                 cleanupAsync(days)
                 )
                 .setNegativeButton(
-                        "取消",
+                        getString(R.string.cancel),
                         null
                 )
                 .show();
@@ -1191,12 +1182,11 @@ public class LogHistoryActivity extends AppCompatActivity {
 
             uiHandler.post(() -> {
                 toast(
-                        "已清理 "
-                                + finalDeletedCount
-                                + " 份 · "
-                                + humanSize(
-                                        finalDeletedBytes
-                                )
+                        getString(
+                                R.string.cleanup_result,
+                                finalDeletedCount,
+                                humanSize(finalDeletedBytes)
+                        )
                 );
 
                 loadHistoryAsync();
@@ -1421,10 +1411,7 @@ public class LogHistoryActivity extends AppCompatActivity {
                     entry.modeLabel;
 
             if (entry.partNumber >= 0) {
-                modeText +=
-                        " · 第 "
-                                + entry.partNumber
-                                + " 卷";
+                modeText += getString(R.string.volume_suffix, entry.partNumber);
             }
 
             holder.mode.setText(modeText);

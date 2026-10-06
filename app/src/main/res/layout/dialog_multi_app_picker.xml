@@ -26,7 +26,7 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="选择多个应用"
+                android:text="@string/multi_picker_title"
                 android:textColor="@color/md_theme_onSurface"
                 android:textSize="22sp"
                 android:textStyle="bold" />
@@ -37,7 +37,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:minWidth="0dp"
-                android:text="取消"
+                android:text="@string/cancel"
                 android:textAllCaps="false" />
         </LinearLayout>
 
@@ -45,7 +45,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="6dp"
-            android:hint="搜索应用名称或包名"
+            android:hint="@string/app_search_hint"
             app:boxBackgroundMode="outline"
             app:boxCornerRadiusBottomEnd="18dp"
             app:boxCornerRadiusBottomStart="18dp"
@@ -83,7 +83,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginStart="8dp"
                 android:layout_weight="1"
-                android:text="正在读取应用列表…"
+                android:text="@string/loading_app_list"
                 android:textColor="@color/md_theme_onSurfaceVariant"
                 android:textSize="13sp" />
 
@@ -91,7 +91,7 @@
                 android:id="@+id/multiPickerResultCount"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="正在读取…"
+                android:text="@string/loading"
                 android:textColor="@color/md_theme_onSurfaceVariant"
                 android:textSize="13sp" />
         </LinearLayout>
@@ -119,7 +119,7 @@
                 android:layout_height="match_parent"
                 android:gravity="center"
                 android:padding="24dp"
-                android:text="未找到匹配的应用"
+                android:text="@string/no_matching_apps"
                 android:textColor="@color/md_theme_onSurfaceVariant"
                 android:textSize="15sp"
                 android:visibility="gone" />
@@ -131,7 +131,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
             android:minHeight="50dp"
-            android:text="完成"
+            android:text="@string/done"
             android:textAllCaps="false"
             app:backgroundTint="@color/md_theme_primary"
             app:cornerRadius="16dp" />

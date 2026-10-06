@@ -148,8 +148,7 @@ public class MainActivity extends AppCompatActivity {
     private int logFilterMode = FILTER_ALL;
     private int appendedLineCounter;
     private Runnable pendingLogRender;
-    private final RealTimeLogAnalyzer realtimeAnalyzer =
-            new RealTimeLogAnalyzer();
+    private RealTimeLogAnalyzer realtimeAnalyzer;
     private long lastRealtimeUiUpdateMs;
 
     private final Shizuku.OnBinderReceivedListener binderReceivedListener = this::refreshShizukuState;
@@ -161,14 +160,14 @@ public class MainActivity extends AppCompatActivity {
                 refreshShizukuState();
 
                 if (grantResult == PackageManager.PERMISSION_GRANTED) {
-                    toast("Shizuku 授权成功");
+                    toast(getString(R.string.shizuku_granted));
                     if (pendingStartAfterPermission) {
                         pendingStartAfterPermission = false;
                         startCaptureInternal();
                     }
                 } else {
                     pendingStartAfterPermission = false;
-                    toast("Shizuku 授权被拒绝");
+                    toast(getString(R.string.shizuku_denied));
                 }
             };
 
@@ -203,9 +202,9 @@ public class MainActivity extends AppCompatActivity {
                 );
 
                 if (status != null
-                        && (status.contains("已停止")
-                        || status.contains("记录结束")
-                        || status.contains("采集结束"))) {
+                        && (status.contains(getString(R.string.status_stop_marker))
+                        || status.contains(getString(R.string.status_record_end_marker))
+                        || status.contains(getString(R.string.status_capture_end_marker)))) {
                     CaptureSessionManager.finishActive(
                             MainActivity.this,
                             status
@@ -220,6 +219,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        realtimeAnalyzer = new RealTimeLogAnalyzer(this);
         setContentView(R.layout.activity_main);
 
         bindViews();
@@ -331,7 +331,7 @@ public class MainActivity extends AppCompatActivity {
         exportButton.setOnClickListener(v -> exportLog());
         snapshotButton.setOnClickListener(v -> {
             requestCrashSnapshot();
-            setStatus("已请求补抓崩溃快照");
+            setStatus(getString(R.string.snapshot_requested));
         });
 
         viewFullLogButton.setOnClickListener(
@@ -359,8 +359,8 @@ public class MainActivity extends AppCompatActivity {
             screenBuffer.setLength(0);
             scheduleLogRender();
             showEmptyLogState(
-                    "预览已清空",
-                    "日志文件不会被删除；新日志到来后会继续显示"
+                    getString(R.string.preview_cleared),
+                    getString(R.string.preview_clear_desc)
             );
         });
 
@@ -483,7 +483,7 @@ public class MainActivity extends AppCompatActivity {
         );
 
         if (mode == CAPTURE_MULTI) {
-            openTargetButton.setText("打开所选应用");
+            openTargetButton.setText(getString(R.string.open_selected_app));
         } else {
             openTargetButton.setText(
                     getString(R.string.open_target)
@@ -528,10 +528,7 @@ public class MainActivity extends AppCompatActivity {
             multiAppPickerDialog.show();
         } catch (Throwable error) {
             multiAppPickerDialog = null;
-            toast(
-                    "打开多应用选择器失败："
-                            + safeMessage(error)
-            );
+            toast(getString(R.string.multi_picker_open_failed, safeMessage(error)));
         }
     }
 
@@ -557,7 +554,7 @@ public class MainActivity extends AppCompatActivity {
     private void updateMultiSummary() {
         if (selectedMultiPackages.isEmpty()) {
             multiSelectedSummary.setText(
-                    "尚未选择应用"
+                    getString(R.string.no_app_selected)
             );
             return;
         }
@@ -587,14 +584,15 @@ public class MainActivity extends AppCompatActivity {
 
         if (selectedMultiPackages.size()
                 > shown) {
-            text.append(" 等");
+            text.append(getString(R.string.selected_apps_more));
         }
 
         multiSelectedSummary.setText(
-                "已选择 "
-                        + selectedMultiPackages.size()
-                        + " 个应用\n"
-                        + text
+                getString(
+                        R.string.selected_apps_summary,
+                        selectedMultiPackages.size(),
+                        text
+                )
         );
     }
 
@@ -662,7 +660,9 @@ public class MainActivity extends AppCompatActivity {
                 manualPackageExpanded ? View.VISIBLE : View.GONE
         );
         manualPackageToggle.setText(
-                manualPackageExpanded ? "▾ 收起手动包名" : "▸ 手动输入包名"
+                manualPackageExpanded
+                        ? getString(R.string.manual_package_expanded)
+                        : getString(R.string.manual_package_collapsed)
         );
 
         if (manualPackageExpanded) packageInput.requestFocus();
@@ -672,24 +672,24 @@ public class MainActivity extends AppCompatActivity {
         runOnUiThread(() -> {
             try {
                 if (!Shizuku.pingBinder()) {
-                    updateShizukuUi("未运行 / 未连接", "—", false, true);
+                    updateShizukuUi(getString(R.string.shizuku_not_running), getString(R.string.unavailable), false, true);
                     return;
                 }
 
                 if (Shizuku.isPreV11()) {
-                    updateShizukuUi("版本过旧", "—", false, true);
+                    updateShizukuUi(getString(R.string.shizuku_old_version), getString(R.string.unavailable), false, true);
                     return;
                 }
 
                 if (Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED) {
                     int uid = Shizuku.getUid();
-                    String mode = uid == 0 ? "Root" : "ADB Shell";
-                    updateShizukuUi("已授权", mode, true, false);
+                    String mode = uid == 0 ? getString(R.string.shizuku_root) : getString(R.string.shizuku_adb_shell);
+                    updateShizukuUi(getString(R.string.shizuku_authorized), mode, true, false);
                 } else {
-                    updateShizukuUi("等待授权", "—", false, false);
+                    updateShizukuUi(getString(R.string.shizuku_waiting_authorization), getString(R.string.unavailable), false, false);
                 }
             } catch (Throwable e) {
-                updateShizukuUi("状态读取失败", "—", false, true);
+                updateShizukuUi(getString(R.string.shizuku_read_failed), getString(R.string.unavailable), false, true);
             }
 
             refreshActionState();
@@ -707,15 +707,15 @@ public class MainActivity extends AppCompatActivity {
         if (success) {
             textColor = getColor(R.color.status_success);
             chipBg = getColor(R.color.status_success_container);
-            chipText = "✓ Shizuku 已连接";
+            chipText = getString(R.string.shizuku_chip_connected);
         } else if (error) {
             textColor = getColor(R.color.status_error);
             chipBg = getColor(R.color.status_error_container);
-            chipText = "Shizuku 未连接";
+            chipText = getString(R.string.shizuku_chip_disconnected);
         } else {
             textColor = getColor(R.color.status_warning);
             chipBg = getColor(R.color.status_warning_container);
-            chipText = "Shizuku 待授权";
+            chipText = getString(R.string.shizuku_chip_pending);
         }
 
         permissionState.setTextColor(textColor);
@@ -820,15 +820,13 @@ public class MainActivity extends AppCompatActivity {
 
         startButton.setText(
                 recording
-                        ? "正在记录"
-                        : getString(
-                                R.string.start_recording
-                        )
+                        ? getString(R.string.recording)
+                        : getString(R.string.start_recording)
         );
 
         if (recording) {
             recordingStateChip.setText(
-                    "● 正在记录"
+                    getString(R.string.recording_indicator)
             );
 
             recordingStateChip.setTextColor(
@@ -850,7 +848,7 @@ public class MainActivity extends AppCompatActivity {
                     );
         } else {
             recordingStateChip.setText(
-                    "已停止"
+                    getString(R.string.stopped)
             );
 
             recordingStateChip.setTextColor(
@@ -882,17 +880,17 @@ public class MainActivity extends AppCompatActivity {
                 pendingStartAfterPermission = false;
 
                 new MaterialAlertDialogBuilder(this)
-                        .setTitle("Shizuku 尚未运行")
-                        .setMessage("请先打开 Shizuku，并通过无线调试 / ADB 或 Root 启动服务。")
-                        .setPositiveButton("打开 Shizuku", (dialog, which) -> openShizukuManager())
-                        .setNegativeButton("取消", null)
+                        .setTitle(getString(R.string.shizuku_not_running_title))
+                        .setMessage(getString(R.string.shizuku_not_running_message))
+                        .setPositiveButton(getString(R.string.open_shizuku), (dialog, which) -> openShizukuManager())
+                        .setNegativeButton(getString(R.string.cancel), null)
                         .show();
                 return false;
             }
 
             if (Shizuku.isPreV11()) {
                 pendingStartAfterPermission = false;
-                toast("Shizuku 版本过旧，请更新");
+                toast(getString(R.string.shizuku_old_version_update));
                 return false;
             }
 
@@ -904,14 +902,14 @@ public class MainActivity extends AppCompatActivity {
 
             if (Shizuku.shouldShowRequestPermissionRationale()) {
                 new MaterialAlertDialogBuilder(this)
-                        .setTitle("需要 Shizuku 授权")
-                        .setMessage("ShizuLog 仅使用 Shizuku 权限读取你主动选择目标应用的 Logcat 日志。")
+                        .setTitle(getString(R.string.shizuku_permission_title))
+                        .setMessage(getString(R.string.shizuku_permission_message))
                         .setPositiveButton(
-                                "继续授权",
+                                getString(R.string.continue_authorization),
                                 (dialog, which) -> Shizuku.requestPermission(REQ_SHIZUKU_PERMISSION)
                         )
                         .setNegativeButton(
-                                "取消",
+                                getString(R.string.cancel),
                                 (dialog, which) -> pendingStartAfterPermission = false
                         )
                         .show();
@@ -922,7 +920,7 @@ public class MainActivity extends AppCompatActivity {
         } catch (Throwable e) {
             pendingStartAfterPermission = false;
             refreshShizukuState();
-            toast("请求 Shizuku 授权失败：" + safeMessage(e));
+            toast(getString(R.string.permission_request_failed, safeMessage(e)));
             return false;
         }
     }
@@ -932,7 +930,7 @@ public class MainActivity extends AppCompatActivity {
                 .getLaunchIntentForPackage("moe.shizuku.privileged.api");
 
         if (launch == null) {
-            toast("未找到 Shizuku，请先安装 Shizuku");
+            toast(getString(R.string.shizuku_not_found));
             return;
         }
         startActivity(launch);
@@ -950,7 +948,7 @@ public class MainActivity extends AppCompatActivity {
             appPickerDialog.show();
         } catch (Throwable error) {
             appPickerDialog = null;
-            toast("打开应用选择器失败：" + safeMessage(error));
+            toast(getString(R.string.app_picker_open_failed, safeMessage(error)));
         }
     }
 
@@ -958,7 +956,7 @@ public class MainActivity extends AppCompatActivity {
         String pkg = textOf(packageInput).trim();
 
         if (pkg.isEmpty()) {
-            toast("请输入包名");
+            toast(getString(R.string.package_required));
             return;
         }
 
@@ -967,7 +965,7 @@ public class MainActivity extends AppCompatActivity {
             String label = String.valueOf(getPackageManager().getApplicationLabel(ai));
             applyTarget(label, pkg);
         } catch (PackageManager.NameNotFoundException e) {
-            toast("没有找到此包名");
+            toast(getString(R.string.package_not_found));
         }
     }
 
@@ -978,12 +976,12 @@ public class MainActivity extends AppCompatActivity {
 
         try {
             ApplicationInfo ai = getPackageManager().getApplicationInfo(pkg, 0);
-            selectedLabel.setText(label + "\n" + pkg + "\nUID " + ai.uid);
+            selectedLabel.setText(getString(R.string.selected_app_details_uid, label, pkg, ai.uid));
 
             Drawable icon = getPackageManager().getApplicationIcon(ai);
             targetAppIcon.setImageDrawable(icon);
         } catch (Exception e) {
-            selectedLabel.setText(label + "\n" + pkg);
+            selectedLabel.setText(getString(R.string.selected_app_details, label, pkg));
             targetAppIcon.setImageResource(android.R.drawable.sym_def_app_icon);
         }
 
@@ -1000,29 +998,29 @@ public class MainActivity extends AppCompatActivity {
             selectTypedPackageSilently();
 
             if (selectedPackage.isEmpty()) {
-                toast("先选择目标应用");
+                toast(getString(R.string.target_required));
                 return;
             }
         } else if (captureMode == CAPTURE_MULTI) {
             if (selectedMultiPackages.isEmpty()) {
-                toast("先选择至少一个应用");
+                toast(getString(R.string.multi_target_required));
                 return;
             }
         }
 
         if (captureMode == CAPTURE_GLOBAL) {
             new MaterialAlertDialogBuilder(this)
-                    .setTitle("开始全局 Logcat？")
+                    .setTitle(getString(R.string.global_logcat_confirm_title))
                     .setMessage(
-                            "全局模式不会按应用 UID 过滤，会记录 Shizuku 当前权限可读取的 main / system / crash 日志。日志量可能快速增长，并可能包含其他应用、账号、路径、网络请求等敏感信息。"
+                            getString(R.string.global_logcat_confirm_message)
                     )
                     .setPositiveButton(
-                            "开始全局记录",
+                            getString(R.string.start_global_recording),
                             (dialog, which) ->
                                     continueStartCapture()
                     )
                     .setNegativeButton(
-                            "取消",
+                            getString(R.string.cancel),
                             null
                     )
                     .show();
@@ -1095,8 +1093,7 @@ public class MainActivity extends AppCompatActivity {
                 uids.add(ai.uid);
 
                 status =
-                        "已启动单应用日志采集，UID="
-                                + ai.uid;
+                        getString(R.string.single_recording_started, ai.uid);
             } else if (captureMode
                     == CAPTURE_MULTI) {
 
@@ -1121,19 +1118,14 @@ public class MainActivity extends AppCompatActivity {
                 }
 
                 if (packages.isEmpty()) {
-                    toast(
-                            "所选应用当前都不可用"
-                    );
+                    toast(getString(R.string.selected_apps_unavailable));
                     return;
                 }
 
                 status =
-                        "已启动多应用日志采集："
-                                + packages.size()
-                                + " 个应用";
+                        getString(R.string.multi_recording_started, packages.size());
             } else {
-                status =
-                        "已启动全局 Logcat 记录";
+                status = getString(R.string.global_recording_started);
             }
 
             String[] packageArray =
@@ -1238,22 +1230,22 @@ public class MainActivity extends AppCompatActivity {
 
             if (recordStatsText != null) {
                 recordStatsText.setText(
-                        "统计：等待日志…"
+                        getString(R.string.stats_waiting)
                 );
             }
 
             showEmptyLogState(
-                    "等待日志",
+                    getString(R.string.open_status_waiting),
                     captureMode == CAPTURE_GLOBAL
-                            ? "全局记录已经开始，正在等待 Logcat 输出"
-                            : "记录已经开始，正在等待目标应用输出日志"
+                            ? getString(R.string.global_record_waiting)
+                            : getString(R.string.record_waiting)
             );
 
             setStatus(status);
         } catch (Exception e) {
             CaptureSessionManager.finishActive(
                     this,
-                    "启动失败：" + safeMessage(e)
+                    getString(R.string.start_failure, safeMessage(e))
             );
 
             prefs().edit()
@@ -1265,10 +1257,7 @@ public class MainActivity extends AppCompatActivity {
 
             refreshActionState();
 
-            toast(
-                    "启动记录失败："
-                            + safeMessage(e)
-            );
+            toast(getString(R.string.record_start_failure, safeMessage(e)));
         }
     }
 
@@ -1288,7 +1277,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void launchTarget() {
         if (captureMode == CAPTURE_GLOBAL) {
-            toast("全局模式没有单独的目标应用");
+            toast(getString(R.string.global_mode_no_target));
             return;
         }
 
@@ -1300,7 +1289,7 @@ public class MainActivity extends AppCompatActivity {
         selectTypedPackageSilently();
 
         if (selectedPackage.isEmpty()) {
-            toast("先选择目标应用");
+            toast(getString(R.string.target_required));
             return;
         }
 
@@ -1309,7 +1298,7 @@ public class MainActivity extends AppCompatActivity {
 
     private void launchOneOfMultiTargets() {
         if (selectedMultiPackages.isEmpty()) {
-            toast("先选择至少一个应用");
+            toast(getString(R.string.multi_target_required));
             return;
         }
 
@@ -1323,13 +1312,13 @@ public class MainActivity extends AppCompatActivity {
         }
 
         new MaterialAlertDialogBuilder(this)
-                .setTitle("打开哪个应用？")
+                .setTitle(getString(R.string.app_picker_title))
                 .setItems(
                         labels,
                         (dialog, which) ->
                                 launchPackage(packages.get(which))
                 )
-                .setNegativeButton("取消", null)
+                .setNegativeButton(getString(R.string.cancel), null)
                 .show();
     }
 
@@ -1338,7 +1327,7 @@ public class MainActivity extends AppCompatActivity {
                 .getLaunchIntentForPackage(packageName);
 
         if (launch == null) {
-            toast("这个应用没有可启动的主界面");
+            toast(getString(R.string.no_launchable_activity));
             return;
         }
 
@@ -1354,7 +1343,7 @@ public class MainActivity extends AppCompatActivity {
     private void stopCapture() {
         CaptureSessionManager.finishActive(
                 this,
-                "用户停止记录"
+                getString(R.string.user_stopped_recording)
         );
 
         prefs().edit().putBoolean(KEY_RECORDING, false).apply();
@@ -1363,12 +1352,12 @@ public class MainActivity extends AppCompatActivity {
         Intent service = new Intent(this, LogCaptureService.class)
                 .setAction(LogCaptureService.ACTION_STOP);
         startService(service);
-        setStatus("已请求停止记录");
+        setStatus(getString(R.string.stop_requested));
     }
 
     private void exportLog() {
         if (currentLogPath == null || !new File(currentLogPath).isFile()) {
-            toast("还没有可导出的日志文件");
+            toast(getString(R.string.export_no_log));
             return;
         }
 
@@ -1398,7 +1387,7 @@ public class MainActivity extends AppCompatActivity {
         try (FileInputStream in = new FileInputStream(currentLogPath);
              OutputStream out = getContentResolver().openOutputStream(uri, "w")) {
 
-            if (out == null) throw new IllegalStateException("无法打开导出位置");
+            if (out == null) throw new IllegalStateException(getString(R.string.cannot_open_export_location));
 
             byte[] buffer = new byte[32 * 1024];
             int count;
@@ -1407,9 +1396,9 @@ public class MainActivity extends AppCompatActivity {
             }
 
             out.flush();
-            toast("日志已导出");
+            toast(getString(R.string.log_exported));
         } catch (Exception e) {
-            toast("导出失败：" + safeMessage(e));
+            toast(getString(R.string.export_failed, safeMessage(e)));
         }
     }
 
@@ -1503,8 +1492,8 @@ public class MainActivity extends AppCompatActivity {
 
         if (raw.isEmpty()) {
             showEmptyLogState(
-                    "暂无日志",
-                    "开始记录后，目标应用的日志会显示在这里"
+                    getString(R.string.no_logs),
+                    getString(R.string.no_logs_desc)
             );
             updateFilterSummary(0, 0);
             return;
@@ -1536,8 +1525,8 @@ public class MainActivity extends AppCompatActivity {
 
         if (filtered.length() == 0) {
             showEmptyLogState(
-                    "没有匹配日志",
-                    "调整搜索关键词或日志级别筛选"
+                    getString(R.string.no_matching_logs),
+                    getString(R.string.adjust_realtime_filter)
             );
             return;
         }
@@ -1655,7 +1644,7 @@ public class MainActivity extends AppCompatActivity {
         else if (logFilterMode == FILTER_WARN) mode = "W+";
         else if (logFilterMode == FILTER_INFO) mode = "I+";
         else if (logFilterMode == FILTER_DEBUG) mode = "D+";
-        else mode = "全部";
+        else mode = getString(R.string.log_all);
 
         String query = textOf(logSearchInput).trim();
         String tag = textOf(realtimeTagInput).trim();
@@ -1669,23 +1658,23 @@ public class MainActivity extends AppCompatActivity {
                 && logFilterMode == FILTER_ALL;
 
         if (total == 0) {
-            logFilterSummary.setText("暂无可筛选日志");
+            logFilterSummary.setText(getString(R.string.no_filterable_logs));
             return;
         }
 
         if (noExtra) {
-            logFilterSummary.setText("实时预览：显示全部 " + total + " 行");
+            logFilterSummary.setText(getString(R.string.realtime_preview_summary, total));
             return;
         }
 
         StringBuilder suffix = new StringBuilder();
         if (!tag.isEmpty()) suffix.append(" · Tag=").append(tag);
         if (!pid.isEmpty()) suffix.append(" · PID=").append(pid);
-        if (!process.isEmpty()) suffix.append(" · 进程=").append(process);
-        if (!query.isEmpty()) suffix.append(" · 搜索“").append(query).append("”");
+        if (!process.isEmpty()) suffix.append(getString(R.string.process_suffix, process));
+        if (!query.isEmpty()) suffix.append(getString(R.string.search_suffix, query));
 
         logFilterSummary.setText(
-                mode + " · 匹配 " + matched + " / " + total + " 行" + suffix
+                getString(R.string.filter_summary, mode, matched, total, suffix.toString())
         );
     }
 
@@ -1771,38 +1760,36 @@ public class MainActivity extends AppCompatActivity {
                 realtimeAnalyzer.snapshot();
 
         realtimeLevelStats.setText(
-                "60 秒窗口：V " + snapshot.verbose
-                        + " · D " + snapshot.debug
-                        + " · I " + snapshot.info
-                        + " · W " + snapshot.warn
-                        + " · E " + snapshot.error
-                        + " · F " + snapshot.fatal
-                        + " · " + String.format(
-                                Locale.US,
-                                "%.1f 行/s",
-                                snapshot.linesPerSecond
-                        )
-                        + " · ERROR " + String.format(
-                                Locale.US,
-                                "%.1f/min",
-                                snapshot.errorsPerMinute
-                        )
+                getString(
+                        R.string.realtime_stats,
+                        snapshot.verbose,
+                        snapshot.debug,
+                        snapshot.info,
+                        snapshot.warn,
+                        snapshot.error,
+                        snapshot.fatal,
+                        snapshot.linesPerSecond,
+                        snapshot.errorsPerMinute
+                )
         );
 
         realtimeTopTags.setText(
-                "Top Tag：" + snapshot.topTagsText()
+                getString(R.string.top_tag, snapshot.topTagsText())
         );
 
         realtimeProcessStats.setText(
-                "PID：" + snapshot.activePidCount
-                        + " · 进程变化 " + snapshot.pidChanges
-                        + " · 最近：" + snapshot.latestProcessChange
+                getString(
+                        R.string.pid_stats,
+                        snapshot.activePidCount,
+                        snapshot.pidChanges,
+                        snapshot.latestProcessChange
+                )
         );
     }
 
     private void openDiagnosticPack() {
         if (currentLogPath == null || !new File(currentLogPath).isFile()) {
-            toast("还没有可导出的日志");
+            toast(getString(R.string.export_no_log));
             return;
         }
         Intent intent = new Intent(this, DiagnosticPackActivity.class);
@@ -1813,7 +1800,7 @@ public class MainActivity extends AppCompatActivity {
     private void analyzeCurrentCrash() {
         if (currentLogPath == null
                 || !new File(currentLogPath).isFile()) {
-            toast("还没有可分析的日志");
+            toast(getString(R.string.no_analyzable_log));
             return;
         }
 
@@ -1834,7 +1821,7 @@ public class MainActivity extends AppCompatActivity {
     private void openCurrentFullLog() {
         if (currentLogPath == null
                 || !new File(currentLogPath).isFile()) {
-            toast("还没有可查看的完整日志");
+            toast(getString(R.string.no_full_log));
             return;
         }
 
@@ -1892,16 +1879,16 @@ public class MainActivity extends AppCompatActivity {
 
         StringBuilder text = new StringBuilder();
 
-        text.append("统计：")
+        text.append(getString(R.string.statistics_prefix))
                 .append(lines)
-                .append(" 行")
+                .append(getString(R.string.line_count_suffix))
                 .append(" · W ")
                 .append(warn)
                 .append(" · E ")
                 .append(error)
                 .append(" · ")
                 .append(rate)
-                .append(" 行/s")
+                .append(getString(R.string.lines_per_second_suffix))
                 .append(" · ")
                 .append(humanSize(bytes));
 
@@ -1912,9 +1899,7 @@ public class MainActivity extends AppCompatActivity {
 
         if (captureMode == CAPTURE_GLOBAL
                 && part > 1) {
-            text.append(" · 第 ")
-                    .append(part)
-                    .append(" 卷");
+            text.append(getString(R.string.volume_suffix, part));
         }
 
         recordStatsText.setText(text.toString());
@@ -2003,7 +1988,7 @@ public class MainActivity extends AppCompatActivity {
                 selectedPackage = pkg;
                 selectedAppLabel = label;
                 packageInput.setText(pkg);
-                selectedLabel.setText(label + "\n" + pkg + "\nUID " + ai.uid);
+                selectedLabel.setText(getString(R.string.selected_app_details_uid, label, pkg, ai.uid));
                 targetAppIcon.setImageDrawable(
                         getPackageManager().getApplicationIcon(ai)
                 );
@@ -2013,9 +1998,9 @@ public class MainActivity extends AppCompatActivity {
                 packageInput.setText(pkg);
 
                 selectedLabel.setText(
-                        "上次目标：" + selectedAppLabel
+                        getString(R.string.last_target, selectedAppLabel)
                                 + "\n" + pkg
-                                + "\n当前未找到安装包"
+                                + "\n" + getString(R.string.package_not_installed)
                 );
 
                 targetAppIcon.setImageResource(
@@ -2023,7 +2008,7 @@ public class MainActivity extends AppCompatActivity {
                 );
             }
         } else {
-            selectedLabel.setText("尚未选择目标应用");
+            selectedLabel.setText(getString(R.string.not_selected_target));
             targetAppIcon.setImageResource(android.R.drawable.sym_def_app_icon);
         }
 
@@ -2041,8 +2026,8 @@ public class MainActivity extends AppCompatActivity {
             loadLogTail(path);
         } else if (screenBuffer.length() == 0) {
             showEmptyLogState(
-                    "暂无日志",
-                    "开始记录后，目标应用的日志会显示在这里"
+                    getString(R.string.no_logs),
+                    getString(R.string.no_logs_desc)
             );
         }
 
@@ -2050,9 +2035,9 @@ public class MainActivity extends AppCompatActivity {
         boolean recording = preferences.getBoolean(KEY_RECORDING, false);
 
         if (lastStatus != null && !lastStatus.isEmpty()) {
-            setStatus((recording ? "● 正在记录\n" : "") + lastStatus);
+            setStatus((recording ? getString(R.string.recording_indicator) + "\n" : "") + lastStatus);
         } else {
-            setStatus(recording ? "● 正在记录" : "等待开始记录");
+            setStatus(recording ? getString(R.string.recording_indicator) : getString(R.string.waiting_to_start));
         }
 
         updateLogMeta();
@@ -2116,16 +2101,16 @@ public class MainActivity extends AppCompatActivity {
 
     private void updateLogMeta() {
         if (currentLogPath == null || currentLogPath.isEmpty()) {
-            logPathText.setText("日志路径：—");
-            logSizeText.setText("日志大小：0 B");
+            logPathText.setText(getString(R.string.log_path_empty));
+            logSizeText.setText(getString(R.string.log_size_empty));
             refreshActionState();
             return;
         }
 
         File file = new File(currentLogPath);
-        logPathText.setText("日志路径：" + currentLogPath);
+        logPathText.setText(getString(R.string.log_path_value, currentLogPath));
         logSizeText.setText(
-                "日志大小：" + humanSize(file.isFile() ? file.length() : 0)
+                getString(R.string.log_size_value, humanSize(file.isFile() ? file.length() : 0))
         );
         refreshActionState();
     }

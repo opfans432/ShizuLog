@@ -13,7 +13,7 @@
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
         android:background="@color/md_theme_background"
-        app:title="崩溃分析"
+        app:title="@string/crash_analysis_title"
         app:titleTextColor="@color/md_theme_onBackground" />
 
     <ScrollView
@@ -56,7 +56,7 @@
                     android:layout_height="wrap_content"
                     android:layout_marginStart="10dp"
                     android:layout_weight="1"
-                    android:text="正在分析…"
+                    android:text="@string/crash_analysis_running"
                     android:textColor="@color/md_theme_onSurface"
                     android:textSize="14sp"
                     android:textStyle="bold" />
@@ -88,7 +88,7 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="分析结果"
+                            android:text="@string/crash_analysis_results"
                             android:textColor="@color/md_theme_onSurface"
                             android:textSize="19sp"
                             android:textStyle="bold" />
@@ -97,7 +97,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="12dp"
-                            android:text="类型"
+                            android:text="@string/crash_type"
                             android:textColor="@color/md_theme_onSurfaceVariant"
                             android:textSize="12sp" />
 
@@ -106,7 +106,7 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="2dp"
-                            android:text="—"
+                            android:text="@string/unavailable"
                             android:textColor="@color/status_error"
                             android:textSize="16sp"
                             android:textStyle="bold" />
@@ -115,7 +115,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="12dp"
-                            android:text="进程"
+                            android:text="@string/crash_process"
                             android:textColor="@color/md_theme_onSurfaceVariant"
                             android:textSize="12sp" />
 
@@ -124,7 +124,7 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="2dp"
-                            android:text="—"
+                            android:text="@string/unavailable"
                             android:textColor="@color/md_theme_onSurface"
                             android:textIsSelectable="true"
                             android:textSize="14sp" />
@@ -133,7 +133,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="12dp"
-                            android:text="线程"
+                            android:text="@string/crash_thread"
                             android:textColor="@color/md_theme_onSurfaceVariant"
                             android:textSize="12sp" />
 
@@ -142,7 +142,7 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="2dp"
-                            android:text="—"
+                            android:text="@string/unavailable"
                             android:textColor="@color/md_theme_onSurface"
                             android:textIsSelectable="true"
                             android:textSize="14sp" />
@@ -151,7 +151,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="12dp"
-                            android:text="异常 / 信号"
+                            android:text="@string/crash_exception_signal"
                             android:textColor="@color/md_theme_onSurfaceVariant"
                             android:textSize="12sp" />
 
@@ -160,7 +160,7 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="2dp"
-                            android:text="—"
+                            android:text="@string/unavailable"
                             android:textColor="@color/md_theme_onSurface"
                             android:textIsSelectable="true"
                             android:textSize="14sp" />
@@ -169,7 +169,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="12dp"
-                            android:text="原因"
+                            android:text="@string/crash_reason"
                             android:textColor="@color/md_theme_onSurfaceVariant"
                             android:textSize="12sp" />
 
@@ -178,7 +178,7 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="2dp"
-                            android:text="—"
+                            android:text="@string/unavailable"
                             android:textColor="@color/md_theme_onSurface"
                             android:textIsSelectable="true"
                             android:textSize="14sp" />
@@ -187,7 +187,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="12dp"
-                            android:text="关键位置"
+                            android:text="@string/crash_key_location"
                             android:textColor="@color/md_theme_onSurfaceVariant"
                             android:textSize="12sp" />
 
@@ -197,7 +197,7 @@
                             android:layout_height="wrap_content"
                             android:layout_marginTop="2dp"
                             android:fontFamily="monospace"
-                            android:text="—"
+                            android:text="@string/unavailable"
                             android:textColor="@color/md_theme_onSurface"
                             android:textIsSelectable="true"
                             android:textSize="13sp" />
@@ -223,7 +223,7 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="堆栈片段"
+                            android:text="@string/crash_stack_excerpt"
                             android:textColor="@color/md_theme_onSurface"
                             android:textSize="18sp"
                             android:textStyle="bold" />
@@ -232,7 +232,7 @@
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="4dp"
-                            android:text="最多显示约 140 行；完整内容仍以原始日志为准。"
+                            android:text="@string/crash_stack_limit"
                             android:textColor="@color/md_theme_onSurfaceVariant"
                             android:textSize="12sp" />
 
@@ -261,7 +261,7 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="复制摘要"
+                        android:text="@string/copy_summary"
                         android:textAllCaps="false"
                         app:cornerRadius="16dp" />
 
@@ -272,7 +272,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginStart="8dp"
                         android:layout_weight="1"
-                        android:text="查看完整日志"
+                        android:text="@string/view_full_log"
                         android:textAllCaps="false" />
                 </LinearLayout>
             </LinearLayout>

@@ -1,3 +1,5 @@
+English version: [README-EN.md](README-EN.md)
+
 <p align="center">
   <img src=".github/assets/shizulog-icon.png" width="96" height="96" alt="ShizuLog">
 </p>

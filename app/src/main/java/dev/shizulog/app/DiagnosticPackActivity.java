@@ -199,23 +199,22 @@ public class DiagnosticPackActivity
 
         if (logFile == null) {
             state.setText(
-                    "没有可用的日志"
+                    getString(R.string.no_available_log)
             );
 
             generate.setEnabled(false);
         } else {
             state.setText(
-                    "准备生成诊断包"
+                    getString(R.string.diagnostic_pack_prepare)
             );
 
             info.setText(
-                    "日志："
-                            + logFile.getName()
-                            + "\n大小："
-                            + humanSize(
-                                    logFile.length()
-                            )
-                            + "\n\n默认使用脱敏版。历史日志也会优先从日志文件头恢复当时的记录模式和目标 App。"
+                    getString(
+                            R.string.diagnostic_log_info,
+                            logFile.getName(),
+                            humanSize(logFile.length()),
+                            getString(R.string.diagnostic_default_privacy_info)
+                    )
             );
         }
 
@@ -241,7 +240,7 @@ public class DiagnosticPackActivity
     private void generatePack() {
         if (logFile == null
                 || !logFile.isFile()) {
-            toast("日志不存在");
+            toast(getString(R.string.log_file_not_found));
             return;
         }
 
@@ -287,7 +286,7 @@ public class DiagnosticPackActivity
 
                 if (!result.success) {
                     state.setText(
-                            "生成失败"
+                            getString(R.string.diagnostic_generation_failed)
                     );
 
                     toast(
@@ -302,24 +301,20 @@ public class DiagnosticPackActivity
 
                 state.setText(
                         result.redacted
-                                ? "脱敏诊断包已生成"
-                                : "原始诊断包已生成"
+                                ? getString(R.string.sanitized_pack_generated)
+                                : getString(R.string.raw_pack_generated)
                 );
 
                 info.setText(
-                        "文件："
-                                + generatedZip
-                                        .getName()
-                                + "\n大小："
-                                + humanSize(
-                                        generatedZip
-                                                .length()
-                                )
-                                + "\n模式："
-                                + (result.redacted
-                                ? "脱敏版"
-                                : "原始版")
-                                + "\n\nZIP 内含 manifest-sha256.txt，可校验诊断包内部文件。"
+                        getString(
+                                R.string.diagnostic_generated_info,
+                                generatedZip.getName(),
+                                humanSize(generatedZip.length()),
+                                result.redacted
+                                        ? getString(R.string.sanitized_mode_recommended)
+                                        : getString(R.string.raw_mode),
+                                getString(R.string.diagnostic_zip_manifest_info)
+                        )
                 );
 
                 setOutputButtonsEnabled(
@@ -340,7 +335,7 @@ public class DiagnosticPackActivity
     private void sharePack() {
         if (generatedZip == null
                 || !generatedZip.isFile()) {
-            toast("请先生成诊断包");
+            toast(getString(R.string.pack_not_generated));
             return;
         }
 
@@ -374,21 +369,18 @@ public class DiagnosticPackActivity
             startActivity(
                     Intent.createChooser(
                             intent,
-                            "分享 ShizuLog 诊断包"
+                            getString(R.string.share_diagnostic_pack)
                     )
             );
         } catch (Exception e) {
-            toast(
-                    "分享失败："
-                            + e.getMessage()
-            );
+            toast(getString(R.string.share_failed, e.getMessage()));
         }
     }
 
     private void requestSaveCopy() {
         if (generatedZip == null
                 || !generatedZip.isFile()) {
-            toast("请先生成诊断包");
+            toast(getString(R.string.pack_not_generated));
             return;
         }
 
@@ -457,7 +449,7 @@ public class DiagnosticPackActivity
 
                 if (out == null) {
                     throw new IllegalStateException(
-                            "无法打开保存位置"
+                            getString(R.string.cannot_open_save_location)
                     );
                 }
 
@@ -479,16 +471,11 @@ public class DiagnosticPackActivity
                 out.flush();
 
                 runOnUiThread(
-                        () -> toast(
-                                "诊断包副本已保存"
-                        )
+                        () -> toast(getString(R.string.diagnostic_copy_saved))
                 );
             } catch (Exception e) {
                 runOnUiThread(
-                        () -> toast(
-                                "保存失败："
-                                        + e.getMessage()
-                        )
+                        () -> toast(getString(R.string.save_failed, e.getMessage()))
                 );
             }
         });
@@ -497,7 +484,7 @@ public class DiagnosticPackActivity
     private void deletePack() {
         if (generatedZip == null
                 || !generatedZip.isFile()) {
-            toast("没有可删除的诊断包");
+            toast(getString(R.string.no_pack_to_delete));
             return;
         }
 
@@ -505,16 +492,16 @@ public class DiagnosticPackActivity
             generatedZip = null;
 
             state.setText(
-                    "诊断包已删除"
+                    getString(R.string.diagnostic_pack_deleted)
             );
 
             setOutputButtonsEnabled(
                     false
             );
 
-            toast("已删除");
+            toast(getString(R.string.deleted));
         } else {
-            toast("删除失败");
+            toast(getString(R.string.delete_failed));
         }
     }
 

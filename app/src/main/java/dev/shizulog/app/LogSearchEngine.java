@@ -1,5 +1,7 @@
 package dev.shizulog.app;
 
+import android.content.Context;
+
 import java.io.File;
 import java.io.RandomAccessFile;
 import java.nio.charset.StandardCharsets;
@@ -33,20 +35,21 @@ public final class LogSearchEngine {
     private LogSearchEngine() {}
 
     public static SearchResult search(
+            Context context,
             File file,
             String query,
             boolean regex
     ) throws Exception {
         if (file == null || !file.isFile()) {
             return SearchResult.error(
-                    "日志文件不存在"
+                    context.getString(R.string.log_file_not_found)
             );
         }
 
         if (query == null
                 || query.trim().isEmpty()) {
             return SearchResult.error(
-                    "请输入搜索内容"
+                    context.getString(R.string.search_input_required)
             );
         }
 
@@ -62,7 +65,7 @@ public final class LogSearchEngine {
                         );
             } catch (PatternSyntaxException e) {
                 return SearchResult.error(
-                        "正则表达式错误："
+                        context.getString(R.string.regex_error_prefix)
                                 + e.getDescription()
                 );
             }
@@ -151,11 +154,12 @@ public final class LogSearchEngine {
     }
 
     public static SearchResult findErrors(
+            Context context,
             File file
     ) throws Exception {
         if (file == null || !file.isFile()) {
             return SearchResult.error(
-                    "日志文件不存在"
+                    context.getString(R.string.log_file_not_found)
             );
         }
 

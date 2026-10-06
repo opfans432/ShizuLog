@@ -13,7 +13,7 @@
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
         android:background="@color/md_theme_background"
-        app:title="历史日志"
+        app:title="@string/history_logs"
         app:titleTextColor="@color/md_theme_onBackground" />
 
     <com.google.android.material.textfield.TextInputLayout
@@ -21,7 +21,7 @@
         android:layout_height="wrap_content"
         android:layout_marginHorizontal="16dp"
         android:layout_marginTop="6dp"
-        android:hint="搜索应用、包名或文件名"
+        android:hint="@string/history_search_hint"
         app:boxBackgroundMode="outline"
         app:boxCornerRadiusBottomEnd="18dp"
         app:boxCornerRadiusBottomStart="18dp"
@@ -59,35 +59,35 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:checked="true"
-                android:text="全部" />
+                android:text="@string/log_all" />
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/historyFilterSingle"
                 style="@style/Widget.Material3.Chip.Filter"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="单应用" />
+                android:text="@string/single_app" />
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/historyFilterMulti"
                 style="@style/Widget.Material3.Chip.Filter"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="多应用" />
+                android:text="@string/multi_app" />
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/historyFilterGlobal"
                 style="@style/Widget.Material3.Chip.Filter"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="全局" />
+                android:text="@string/global" />
 
             <com.google.android.material.chip.Chip
                 android:id="@+id/historyFilterCrash"
                 style="@style/Widget.Material3.Chip.Filter"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="有崩溃" />
+                android:text="@string/has_crash" />
         </com.google.android.material.chip.ChipGroup>
     </HorizontalScrollView>
 
@@ -106,7 +106,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="正在扫描日志…"
+            android:text="@string/scanning_logs"
             android:textColor="@color/md_theme_onSurfaceVariant"
             android:textSize="12sp" />
 
@@ -116,7 +116,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:minWidth="0dp"
-            android:text="排序：最新"
+            android:text="@string/sort_latest"
             android:textAllCaps="false" />
 
         <com.google.android.material.button.MaterialButton
@@ -125,7 +125,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:minWidth="0dp"
-            android:text="清理"
+            android:text="@string/cleanup"
             android:textAllCaps="false" />
     </LinearLayout>
 
@@ -159,7 +159,7 @@
             android:layout_height="match_parent"
             android:gravity="center"
             android:padding="32dp"
-            android:text="还没有历史日志"
+            android:text="@string/no_history_logs"
             android:textColor="@color/md_theme_onSurfaceVariant"
             android:textSize="15sp"
             android:visibility="gone" />

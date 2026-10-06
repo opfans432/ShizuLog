@@ -241,8 +241,8 @@ final class MultiAppPickerDialog extends Dialog {
         int count = selected.size();
         doneButton.setText(
                 count == 0
-                        ? "完成"
-                        : "完成（" + count + "）"
+                        ? appContext.getString(R.string.done)
+                        : appContext.getString(R.string.done_count, count)
         );
     }
 
@@ -299,7 +299,7 @@ final class MultiAppPickerDialog extends Dialog {
 
                         showLoading(false);
                         emptyText.setText(
-                                "读取应用列表失败"
+                appContext.getString(R.string.read_app_list_failed)
                         );
                         emptyText.setVisibility(
                                 View.VISIBLE
@@ -308,7 +308,7 @@ final class MultiAppPickerDialog extends Dialog {
                                 View.GONE
                         );
                         resultCountText.setText(
-                                "0 个应用"
+                                appContext.getString(R.string.app_count, 0)
                         );
                     }
                 });
@@ -464,9 +464,9 @@ final class MultiAppPickerDialog extends Dialog {
         adapter.replace(filtered);
 
         resultCountText.setText(
-                filtered.size()
-                        + " 个应用 · 已选 "
-                        + selected.size()
+                appContext.getString(R.string.app_count, filtered.size())
+                        + " · "
+                        + appContext.getString(R.string.selected_app_count, selected.size())
         );
 
         boolean empty =
@@ -474,7 +474,7 @@ final class MultiAppPickerDialog extends Dialog {
                         && !allApps.isEmpty();
 
         emptyText.setText(
-                "未找到匹配的应用"
+                appContext.getString(R.string.no_matching_apps)
         );
 
         emptyText.setVisibility(
@@ -533,7 +533,7 @@ final class MultiAppPickerDialog extends Dialog {
             appList.setVisibility(View.GONE);
             emptyText.setVisibility(View.GONE);
             resultCountText.setText(
-                    "正在读取…"
+                    appContext.getString(R.string.loading)
             );
         } else if (!allApps.isEmpty()) {
             appList.setVisibility(
